@@ -1,0 +1,28 @@
+name: Astro Tracker Automation
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # દર કલાકે રન થશે
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install swisseph flatlib google-api-python-client google-auth-httplib2 google-auth-oauthlib
+
+      - name: Create credentials file
+        run: echo "${{ secrets.CREDENTIALS_JSON }}" > credentials.json
+
+      - name: Run Tracker
+        run: python astro.tracker.py
