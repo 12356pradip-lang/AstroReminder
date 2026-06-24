@@ -22,8 +22,9 @@ jobs:
 
       - name: Create credentials file
         run: |
-          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
+          echo '${{secrets.GOOGLE_CREDENTIALS}}' > credentials.json
 
       - name: Run Tracker
         run: |
           python astro.tracker.py
+          
