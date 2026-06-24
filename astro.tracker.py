@@ -21,12 +21,16 @@ def create_calendar_event(summary, description):
     try:
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
+        calendar_list = service.calendarList().list().execute()
+        for cal in calendar_list.get('items', []):
+            print(f"કેલેન્ડર મળ્યું: {cal['summary']} - ID: {cal['id']}")
         event = {
             'summary': summary, 'description': description,
             'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'},
             'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
         }
-        service.events().insert(calendarId='primary', body=event).execute()
+        service.events().insert(calendarId='12356pradip@gmail.com', body=event).execute()
+        print(f"DEBUG: ઇવેન્ટ '{summary}' આ કેલેન્ડરમાં મોકલાઈ છે: primary")
         print(f"✅ ઇવેન્ટ બની: {summary}")
     except Exception as e:
         print(f"❌ કેલેન્ડર એરર: {e}")
