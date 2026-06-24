@@ -7,7 +7,7 @@ from google.oauth2 import service_account
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-# અહી સેટિંગ છે - જો 4.0 થી કામ ન થાય તો આને બદલી શકાય
+# કરેક્શન સેટિંગ: જે તમારે લોકલ અને ગીટહબ બંને માટે રાખવાનું છે
 CHANDRA_OFFSET = -3.3 
 
 PUSHKAR_DATA = [
@@ -29,6 +29,7 @@ def create_calendar_event(summary, description):
             'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
         }
         service.events().insert(calendarId='primary', body=event).execute()
+        print("✅ કેલેન્ડર ઇવેન્ટ સફળતાપૂર્વક બની ગઈ છે.")
     except Exception as e:
         print(f"❌ કેલેન્ડર એરર: {e}")
 
@@ -41,7 +42,7 @@ def get_full_astro_details(planet_id):
     flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
     data = swe.calc_ut(jd, planet_id, flags)[0][0]
     
-    # ચંદ્ર માટે કરેક્શન: ફાઇનલ પોઝિશન પર એપ્લાય કરવું
+    # ચંદ્ર માટે કરેક્શન
     if planet_id == 1:
         data = (data + CHANDRA_OFFSET) % 360
     
@@ -64,15 +65,24 @@ def get_full_astro_details(planet_id):
 def run_pre_alert():
     planets = [("સૂર્ય", 0), ("ચંદ્ર", 1)]
     print("--- દ્રિક પંચાંગ સચોટ ગણતરી ---")
+    
+    is_pushkar_active = False
+    details_to_log = ""
+
     for name, p_id in planets:
         info, nak, pada = get_full_astro_details(p_id)
         print(f"{name}: {info} | નક્ષત્ર: {nak} (પદ {pada})")
         
+        # પુષ્કર ચેક
         for entry in PUSHKAR_DATA:
             if entry["nakshatra"] == nak and entry["pada"] == pada:
                 print(f"✅ મેચ મળ્યું: {name} | {nak} | પદ {pada}")
-                desc = f"{name} સ્થિતિ: {info}\nનક્ષત્ર: {nak} (પદ {pada})"
-                create_calendar_event(f"પુષ્કર નવમાંશ: {name}", desc)
+                is_pushkar_active = True
+                details_to_log += f"{name}: {nak} (પદ {pada})\n"
+
+    # સૂર્ય કે ચંદ્ર કોઈ પણ એક પુષ્કરમાં હોય તો એલર્ટ આપશે
+    if is_pushkar_active:
+        create_calendar_event(f"પુષ્કર નવમાંશ એલર્ટ", details_to_log)
 
 if __name__ == "__main__":
     run_pre_alert()
