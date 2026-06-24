@@ -18,13 +18,13 @@ jobs:
           python-version: '3.9'
 
       - name: Install dependencies
-        run: |
-          pip install swisseph flatlib google-api-python-client google-auth-httplib2 google-auth-oauthlib
-
+      run: |
+        pip install swisseph flatlib google-api-python-client google-auth-httplib2 google-auth-oauthlib
+      
       - name: Create credentials file
       run: |
         echo '${{ secrets.GOOGLE_CREDENTIALS }}' > credentials.json
-        
+      
       - name: Run Tracker
       run: |
         python astro.tracker.py
