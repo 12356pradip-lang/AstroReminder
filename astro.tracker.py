@@ -3,11 +3,9 @@ import swisseph as swe
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# Google Calendar Setup
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 
-# કરેક્શન સેટિંગ: જે તમારે લોકલ અને ગીટહબ બંને માટે રાખવાનું છે
 CHANDRA_OFFSET = -3.3 
 
 PUSHKAR_DATA = [
@@ -29,60 +27,44 @@ def create_calendar_event(summary, description):
             'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
         }
         service.events().insert(calendarId='primary', body=event).execute()
-        print("✅ કેલેન્ડર ઇવેન્ટ સફળતાપૂર્વક બની ગઈ છે.")
+        print(f"✅ ઇવેન્ટ બની: {summary}")
     except Exception as e:
         print(f"❌ કેલેન્ડર એરર: {e}")
 
-def get_full_astro_details(planet_id):
+def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    now = datetime.utcnow()
-    jd = swe.julday(now.year, now.month, now.day, now.hour + (now.minute / 60.0) + (now.second / 3600.0) + 5.5)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, 
+                    target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
     swe.set_topo(70.8022, 22.3039, 0)
     
     flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
     data = swe.calc_ut(jd, planet_id, flags)[0][0]
     
-    # ચંદ્ર માટે કરેક્શન
     if planet_id == 1:
         data = (data + CHANDRA_OFFSET) % 360
     
-    rashi_idx = int(data // 30)
-    rashi_rem = data % 30
-    deg = int(rashi_rem)
-    minutes = int((rashi_rem - deg) * 60)
-    seconds = int((((rashi_rem - deg) * 60) - minutes) * 60)
-    
-    nak_pos = data % 13.333333333333334
     nak_idx = int(data // 13.333333333333334)
+    nak_pos = data % 13.333333333333334
     pada = int(nak_pos // 3.3333333333333335) + 1
     
-    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
-    
-    info = f"{rashis[rashi_idx]} રાશિ ({deg}° {minutes}' {seconds}\")"
-    return info, nakshatras[nak_idx], pada
+    return nakshatras[nak_idx], pada
 
 def run_pre_alert():
-    planets = [("સૂર્ય", 0), ("ચંદ્ર", 1)]
-    print("--- દ્રિક પંચાંગ સચોટ ગણતરી ---")
+    # સેટિંગ: સૂર્ય(0) માટે 7 કલાક, ચંદ્ર(1) માટે 2 કલાક
+    look_ahead = {0: 7, 1: 2}
+    print("--- એડવાન્સ પુષ્કર એલર્ટ ચેક શરૂ ---")
     
-    is_pushkar_active = False
-    details_to_log = ""
-
-    for name, p_id in planets:
-        info, nak, pada = get_full_astro_details(p_id)
-        print(f"{name}: {info} | નક્ષત્ર: {nak} (પદ {pada})")
+    for p_id, hours in look_ahead.items():
+        name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
+        future_time = datetime.utcnow() + timedelta(hours=hours)
+        nak, pada = get_astro_position(p_id, future_time)
         
-        # પુષ્કર ચેક
         for entry in PUSHKAR_DATA:
             if entry["nakshatra"] == nak and entry["pada"] == pada:
-                print(f"✅ મેચ મળ્યું: {name} | {nak} | પદ {pada}")
-                is_pushkar_active = True
-                details_to_log += f"{name}: {nak} (પદ {pada})\n"
-
-    # સૂર્ય કે ચંદ્ર કોઈ પણ એક પુષ્કરમાં હોય તો એલર્ટ આપશે
-    if is_pushkar_active:
-        create_calendar_event(f"પુષ્કર નવમાંશ એલર્ટ", details_to_log)
+                msg = f"એલર્ટ: {name} આગામી {hours} કલાકમાં પુષ્કર નવમાંશમાં આવશે.\nનક્ષત્ર: {nak} (પદ {pada})"
+                print(f"✅ {msg}")
+                create_calendar_event(f"પુષ્કર એડવાન્સ એલર્ટ: {name}", msg)
 
 if __name__ == "__main__":
     run_pre_alert()
