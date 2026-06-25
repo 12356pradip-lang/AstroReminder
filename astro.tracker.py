@@ -6,7 +6,7 @@ from google.oauth2 import service_account
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
-CHANDRA_OFFSET = -3.3 
+CHANDRA_OFFSET = -2.9
 
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navamsha": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan_tatva": "જળ"},
@@ -51,7 +51,9 @@ def get_astro_position(planet_id, target_time):
                     target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
     swe.set_topo(70.8022, 22.3039, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
-    if planet_id == 1: data = (data + CHANDRA_OFFSET) % 360
+
+    if planet_id == 1: 
+        data = (data + CHANDRA_OFFSET) % 360
     
     nak_idx = int(data // 13.333333333333334)
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
