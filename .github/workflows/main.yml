@@ -28,3 +28,4 @@ jobs:
       - name: Run Tracker
         run: |
           python astro.tracker.py
+          python navtara.tracker.py
