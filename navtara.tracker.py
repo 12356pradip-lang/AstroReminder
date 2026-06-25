@@ -8,7 +8,11 @@ SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 LAT, LON = 22.2735, 70.7513  # રાજકોટનું લોકેશન
+<<<<<<< HEAD
 MOON_OFFSET = -4.7 # તમારા અવલોકન મુજબનો તફાવત
+=======
+MOON_OFFSET = -5.7 # તમારા અવલોકન મુજબનો તફાવત
+>>>>>>> 408bede9498afacc8c20903757b179c8eb86e3a8
 
 NAVTARA_DATA = {
     "જન્મ તારા": {"naks": ["ઉત્તરા ફાલ્ગુની", "ઉત્તરાષાઢા", "કૃતિકા"], "swami": "સૂર્ય"},
