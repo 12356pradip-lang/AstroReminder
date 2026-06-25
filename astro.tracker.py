@@ -7,8 +7,8 @@ SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 LAT, LON = 22.2735, 70.7513  # રાજકોટનું લોકેશન
-CHANDRA_OFFSET = -2.9
 
+CHANDRA_OFFSET = -2.9
 
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navamsha": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan_tatva": "જળ"},
