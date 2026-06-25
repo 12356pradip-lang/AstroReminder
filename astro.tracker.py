@@ -4,6 +4,7 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
 SERVICE_ACCOUNT_FILE = 'credentials.json'
+CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 CHANDRA_OFFSET = -3.3 
 
@@ -40,6 +41,10 @@ def format_dms(deg):
     s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
 
+def get_rasi_name(longitude):
+    rasis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
+    return rasis[int(longitude // 30)]
+
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     jd = swe.julday(target_time.year, target_time.month, target_time.day, 
@@ -52,13 +57,11 @@ def get_astro_position(planet_id, target_time):
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
     pada = int((data % 13.333333333333334) // 3.3333333333333335) + 1
     
-    # રાશિ ડિગ્રી માટે
+    # ડિગ્રી ગણતરી
     rasi_degree = data % 30
-    return nakshatras[nak_idx], pada, data, rasi_degree
-
-def get_rasi_name(longitude):
-    rasis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
-    return rasis[int(longitude // 30)]
+    nak_degree = data % 13.333333333333334
+    
+    return nakshatras[nak_idx], pada, data, rasi_degree, nak_degree
 
 def create_calendar_event(summary, description):
     try:
@@ -69,7 +72,7 @@ def create_calendar_event(summary, description):
             'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'},
             'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
         }
-        service.events().insert(calendarId='12356pradip@gmail.com', body=event).execute()
+        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         print(f"✅ ઇવેન્ટ બની: {summary}")
     except Exception as e:
         print(f"❌ કેલેન્ડર એરર: {e}")
@@ -81,35 +84,24 @@ def run_pre_alert():
     for p_id, hours in look_ahead.items():
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         
-        # વર્તમાન સ્થિતિ
-        curr_nak, curr_pada, curr_long, curr_deg = get_astro_position(p_id, datetime.utcnow())
+        curr_nak, curr_pada, curr_long, curr_rasi_deg, curr_nak_deg = get_astro_position(p_id, datetime.utcnow())
         
-        # ભવિષ્યની સ્થિતિ (પુષ્કર માટે)
+        # આઉટપુટ પ્રિન્ટિંગ
+        print(f"\n[{name} રીયલ ટાઈમ]")
+        print(f"રાશિ: {get_rasi_name(curr_long)} ({format_dms(curr_rasi_deg)})")
+        print(f"નક્ષત્ર: {curr_nak} | પદ: {curr_pada} | નક્ષત્ર ડિગ્રી: {format_dms(curr_nak_deg)}")
+        
         future_time = datetime.utcnow() + timedelta(hours=hours)
-        fut_nak, fut_pada, _, _ = get_astro_position(p_id, future_time)
+        fut_nak, fut_pada, _, _, _ = get_astro_position(p_id, future_time)
         
         entry = next((item for item in PUSHKAR_DATA if item["nakshatra"] == fut_nak and item["pada"] == fut_pada), None)
         
         if entry:
-            msg = f"""
-એલર્ટ: {name} આગામી {hours} કલાકમાં પુષ્કર નવમાંશમાં આવશે.
-
-વર્તમાન સ્થિતિ:
-- રાશિ: {get_rasi_name(curr_long)} ({format_dms(curr_deg)})
-- નક્ષત્ર: {curr_nak} ({curr_pada} પદ)
-
-આગામી પુષ્કર સ્થિતિ:
-- નક્ષત્ર: {fut_nak}
-- પદ: {fut_pada}
-- નવમાંશ રાશિ: {entry['navamsha']}
-- મૂળ નક્ષત્ર તત્વ: {entry['mul_tatva']}
-- નાવંશ તત્વ: {entry['nav_tatva']}
-- પ્રધાન તત્વ: {entry['pradhan_tatva']}
-            """
-            print(f"✅ {name} માટે પુષ્કર ડેટા મળ્યો! (આગામી નક્ષત્ર: {fut_nak})")
+            msg = f"એલર્ટ: {name} આગામી {hours} કલાકમાં પુષ્કર નવમાંશમાં આવશે. \nવર્તમાન સ્થિતિ: {curr_nak} ({curr_pada} પદ)\nઆગામી પુષ્કર: {fut_nak} ({fut_pada} પદ)"
+            print(f"✅ {name} માટે પુષ્કર ડેટા મળ્યો!")
             create_calendar_event(f"પુષ્કર એડવાન્સ એલર્ટ: {name}", msg)
         else:
-            print(f"ℹ️ {name} અત્યારે {curr_nak} ({curr_pada} પદ) માં છે, જે પુષ્કર નથી.")
+            print(f"ℹ️ {name} અત્યારે પુષ્કર નક્ષત્રમાં નથી.")
 
 if __name__ == "__main__":
     run_pre_alert()
