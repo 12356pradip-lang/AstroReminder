@@ -6,7 +6,9 @@ from google.oauth2 import service_account
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
-CHANDRA_OFFSET = -2.9
+LAT, LON = 22.2735, 70.7513  # રાજકોટનું લોકેશન
+
+CHANDRA_OFFSET = -3.3 
 
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navamsha": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan_tatva": "જળ"},
@@ -51,15 +53,12 @@ def get_astro_position(planet_id, target_time):
                     target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
     swe.set_topo(70.8022, 22.3039, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
-
-    if planet_id == 1: 
-        data = (data + CHANDRA_OFFSET) % 360
+    if planet_id == 1: data = (data + CHANDRA_OFFSET) % 360
     
     nak_idx = int(data // 13.333333333333334)
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
     pada = int((data % 13.333333333333334) // 3.3333333333333335) + 1
     
-    # ડિગ્રી ગણતરી
     rasi_degree = data % 30
     nak_degree = data % 13.333333333333334
     
@@ -88,7 +87,6 @@ def run_pre_alert():
         
         curr_nak, curr_pada, curr_long, curr_rasi_deg, curr_nak_deg = get_astro_position(p_id, datetime.utcnow())
         
-        # આઉટપુટ પ્રિન્ટિંગ
         print(f"\n[{name} રીયલ ટાઈમ]")
         print(f"રાશિ: {get_rasi_name(curr_long)} ({format_dms(curr_rasi_deg)})")
         print(f"નક્ષત્ર: {curr_nak} | પદ: {curr_pada} | નક્ષત્ર ડિગ્રી: {format_dms(curr_nak_deg)}")
@@ -99,7 +97,21 @@ def run_pre_alert():
         entry = next((item for item in PUSHKAR_DATA if item["nakshatra"] == fut_nak and item["pada"] == fut_pada), None)
         
         if entry:
-            msg = f"એલર્ટ: {name} આગામી {hours} કલાકમાં પુષ્કર નવમાંશમાં આવશે. \nવર્તમાન સ્થિતિ: {curr_nak} ({curr_pada} પદ)\nઆગામી પુષ્કર: {fut_nak} ({fut_pada} પદ)"
+            msg = f"""એલર્ટ: {name} આગામી {hours} કલાકમાં પુષ્કર નવમાંશમાં આવશે.
+
+વર્તમાન સ્થિતિ:
+- રાશિ: {get_rasi_name(curr_long)} ({format_dms(curr_rasi_deg)})
+- નક્ષત્ર: {curr_nak} ({curr_pada} પદ)
+- નક્ષત્ર ડિગ્રી: {format_dms(curr_nak_deg)}
+
+આગામી પુષ્કર સ્થિતિ:
+- નક્ષત્ર: {fut_nak}
+- પદ: {fut_pada}
+- નવમાંશ રાશિ: {entry['navamsha']}
+- મૂળ તત્વ: {entry['mul_tatva']}
+- નવમાંશ તત્વ: {entry['nav_tatva']}
+- પ્રધાન તત્વ: {entry['pradhan_tatva']}
+"""
             print(f"✅ {name} માટે પુષ્કર ડેટા મળ્યો!")
             create_calendar_event(f"પુષ્કર એડવાન્સ એલર્ટ: {name}", msg)
         else:
