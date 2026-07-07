@@ -29,4 +29,4 @@ jobs:
         run: |
           python astro.tracker.py
           python navtara.tracker.py
-          
+          python pushkar.alert.py
