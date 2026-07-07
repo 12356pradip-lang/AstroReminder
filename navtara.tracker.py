@@ -64,7 +64,7 @@ def run_tracker():
         rashi, r_deg, nak, n_deg = get_astro_data(p_id, datetime.now())
         print(f"{name}: રાશિ={rashi} ({get_dms(r_deg)}), નક્ષત્ર={nak} ({get_dms(n_deg)})")
         
-        future_time = datetime.now() + timedelta(hours=3)
+        future_time = datetime.now() + timedelta(hours=12)
         _, _, fut_nak, _ = get_astro_data(p_id, future_time)
         
         if nak != fut_nak:
