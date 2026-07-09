@@ -79,7 +79,7 @@ def create_calendar_event(summary, description):
         print(f"❌ કેલેન્ડર એરર: {e}")
 
 def run_pre_alert():
-    look_ahead = {0: 7, 1: 2}
+    look_ahead = {0: 6, 1: 6}
     print("--- એડવાન્સ પુષ્કર એલર્ટ ચેક શરૂ ---")
     
     for p_id, hours in look_ahead.items():
