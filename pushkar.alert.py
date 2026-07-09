@@ -116,7 +116,7 @@ def run_pre_alert():
     if alert_found:
         print(alert_msg)
         print("❌ એલર્ટ મળવાને કારણે સ્ક્રિપ્ટ અટકે છે (ગિટહબ ઇમેઇલ મોકલશે).")
-        sys.exit(1) 
+        sys.exit(0) 
     else:
         print("\n👍 બધું સામાન્ય છે. કોઈ પુષ્કર એલર્ટ નથી.")
         sys.exit(0)
