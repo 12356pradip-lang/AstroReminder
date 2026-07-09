@@ -65,7 +65,7 @@ def get_astro_position(planet_id, target_time):
     return nakshatras[nak_idx], pada, data, rasi_degree, nak_degree
 
 def run_pre_alert():
-    look_ahead = {0: 7, 1: 2}  # 0 = સૂર્ય (7 કલાક), 1 = ચંદ્ર (2 કલાક)
+    look_ahead = {0: 6, 1: 6}  # 0 = સૂર્ય (6 કલાક), 1 = ચંદ્ર (6 કલાક)
     print("--- એડવાન્સ પુષ્કર એલર્ટ ચેક શરૂ ---")
     
     alert_found = False
