@@ -1,96 +1,80 @@
 from datetime import datetime, timedelta, timezone
 import swisseph as swe
 import requests
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
 
-# કોન્ફિગરેશન
-SERVICE_ACCOUNT_FILE = 'credentials.json'
-CALENDAR_ID = '12356pradip@gmail.com'
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-LAT, LON = 22.2735, 70.7513
-TELEGRAM_TOKEN = "8795156986:AAGoUEF_iZKhD91Nhv6UbkshhUBSB3YQcT8"
+# --- કોન્ફિગરેશન ---
+TELEGRAM_TOKEN = "8795156986:AAGoUEF_izKhD91Nhv6UbkshUBS3YQcT8"
 TELEGRAM_CHAT_ID = "8713489324"
+LAT, LON = 22.2735, 70.7513
 
 NAVTARA_DATA = {
-    "જન્મ તારા": ["જ્યેષ્ઠા", "રેવતી", "આશ્લેષા"],
-    "સંપત તારા": ["મૂલ", "અશ્વિની", "મઘા"],
-    "ક્ષેમ તારા": ["ઉત્તરા ફાલ્ગુની", "ઉત્તરષાઢા", "કૃતિકા"],
-    "સાધક તારા": ["ચિત્રા", "ધનિષ્ઠા", "મૃગશીર્ષ"],
-    "મૈત્રી તારા": ["વિશાખા", "પૂર્વાભાદ્રપદ", "પુનર્વસુ"],
-    "અતિ મૈત્રી તારા": ["અનુરાધા", "ઉત્તરાભાદ્રપદ", "પુષ્ય"]
+    "જન્મ તારા": ["અશ્વિની", "મઘા", "મૂલા"],
+    "સંપત તારા": ["ભરણી", "પૂર્વા ફાલ્ગુની", "પૂર્વાષાઢા"],
+    "ક્ષેમ તારા": ["કૃતિકા", "ઉત્તરા ફાલ્ગુની", "ઉત્તરાષાઢા"],
+    "સાધક તારા": ["રોહિણી", "હસ્ત", "શ્રવણ"],
+    "મિત્ર તારા": ["મૃગશીર્ષ", "ચિત્રા", "ધનિષ્ટા"],
+    "નૈધન તારા": ["આર્દ્રા", "સ્વાતિ", "શતભિષા"],
+    "સાધક તારા": ["પુનર્વસુ", "વિશાખા", "પૂર્વા ભાદ્રપદા"],
+    "પરમ મિત્ર તારા": ["પુષ્ય", "અનુરાધા", "ઉત્તરા ભાદ્રપદા"],
+    "પરમ મિત્ર તારા": ["આશ્લેષા", "જ્યેષ્ઠા", "રેવતી"]
 }
 
 def send_telegram_msg(text):
     url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={text}"
     requests.get(url)
 
-def create_calendar_event(summary, description):
-    try:
-        ist = timezone(timedelta(hours=5, minutes=30))
-        start_time = datetime.now(ist)
-        creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        service = build('calendar', 'v3', credentials=creds)
-        event = {
-            'summary': summary, 'description': description,
-            'start': {'dateTime': start_time.isoformat()},
-            'end': {'dateTime': (start_time + timedelta(hours=1)).isoformat()},
-        }
-        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-    except Exception as e:
-        print(f"❌ કેલેન્ડર એરર: {e}")
-
-def get_nakshatra(planet_id, time):
+def get_nakshatra(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(time.year, time.month, time.day, time.hour + time.minute/60.0 + 5.5)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, 
+                    target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
     swe.set_topo(LON, LAT, 0)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
-    if planet_id == 1: data = (data - 2.9) % 360 # ચંદ્ર ઓફસેટ
-    
-    naks = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    return naks[int(data // 13.333333333333334) % 27]
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
+    nak_idx = int(data // 13.333333333333334)
+    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
+    return nakshatras[nak_idx]
 
-def get_transition_times(planet_id):
-    start = datetime.utcnow()
-    current_n = get_nakshatra(planet_id, start)
-    entry, exit_time = None, None
+def get_times(planet_id, current_n):
+    current_time = datetime.now(timezone.utc)
+    entry_time = None
+    exit_time = None
     
-    # પ્રવેશ સમય શોધવો
-    for i in range(0, 24 * 60, 10):
-        t = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t) != current_n:
-            exit_time = t + timedelta(hours=5, minutes=30)
+    # પાછળના 24 કલાક અને આગળના 24 કલાક ચેક કરો
+    for i in range(-24 * 60, 24 * 60, 10):
+        check_time = current_time + timedelta(minutes=i)
+        nak = get_nakshatra(planet_id, check_time)
+        
+        if nak == current_n:
+            if entry_time is None: entry_time = check_time
+        elif entry_time is not None and exit_time is None:
+            exit_time = check_time
             break
-    
-    # નિર્ગમન સમય માટે પાછળ તપાસવું
-    for i in range(0, -24 * 60, -10):
-        t = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t) != current_n:
-            entry = t + timedelta(hours=5, minutes=30)
-            break
-    return entry, exit_time
+            
+    # None ની એરર ન આવે તે માટે ચેક
+    entry_str = entry_time.strftime("%d %b %H:%M") if entry_time else "N/A"
+    exit_str = exit_time.strftime("%d %b %H:%M") if exit_time else "N/A"
+            
+    return entry_str, exit_str
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
-    
-    # 12 કલાક પછીનો સમય નક્કી કરો
-    future_time = datetime.utcnow() + timedelta(hours=12)
-    
+    current_time = datetime.now(timezone.utc)
+    future_time = current_time + timedelta(hours=12)
+
     for p_id, p_name in planets.items():
-        # અહીં 'future_time' નો ઉપયોગ કરો જેથી 12 કલાક પછીનું નક્ષત્ર ચેક થાય
+        # 12 કલાક પછીનું નક્ષત્ર ચેક કરો
         fut_n = get_nakshatra(p_id, future_time)
         
-        # ચેક કરવું કે શું આ ભવિષ્યનું નક્ષત્ર નવતારા લિસ્ટમાં છે
+        # આ નક્ષત્ર માટે એન્ટ્રી અને એક્ઝિટ મેળવો
+        entry, exit_t = get_times(p_id, fut_n)
+        
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                # પ્રવેશ અને નિર્ગમન સમય તે જ રીતે મળશે
-                entry, exit_t = get_transition_times(p_id) 
-                
-                msg = f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\nનક્ષત્ર: {fut_n}\nપ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\nનિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}"
-                
-                create_calendar_event(f"નવતારા: {tara}", msg)
+                msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
+                       f"નક્ષત્ર: {fut_n}\n"
+                       f"પ્રવેશ: {entry}\n"
+                       f"નિર્ગમન: {exit_t}")
                 send_telegram_msg(msg)
-                print(f"✅ 12 કલાક એડવાન્સ એલર્ટ મોકલાયું: {msg}")
+                print(f"✅ એલર્ટ મોકલાયું:\n{msg}")
 
 if __name__ == "__main__":
     run_tracker()
