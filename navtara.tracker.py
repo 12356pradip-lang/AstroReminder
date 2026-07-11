@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import swisseph as swe
 import requests
 import os
@@ -23,6 +23,22 @@ NAVTARA_DATA = {
     "અતિ મૈત્રી તારા": ["પૂર્વાષાઢા", "ભરણી", "પૂર્વા ફાલ્ગુની"]
 }
 
+def create_calendar_event(summary, description):
+    try:
+        creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        service = build('calendar', 'v3', credentials=creds)
+        event = {
+            'summary': summary,
+            'description': description,
+            'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'},
+            'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
+        }
+        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        return True
+    except Exception as e:
+        print(f"❌ કેલેન્ડર એરર: {e}")
+        return False
+
 def get_dms(deg):
     d = int(deg)
     m = int((deg - d) * 60)
@@ -35,7 +51,6 @@ def get_planet_data(planet_id, time):
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
     if planet_id == 1: data = (data - 2.9) % 360
-    
     rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
     rashi = rashis[int(data // 30)]
     degree_in_rashi = data % 30
@@ -74,9 +89,7 @@ def run_tracker():
     future_time = now + timedelta(hours=12)
     
     for p_id, p_name in planets.items():
-        # વર્તમાન સ્થિતિ
         cur_rashi, cur_nak, cur_deg = get_planet_data(p_id, now)
-        # ૧૨ કલાક પછીની સ્થિતિ
         fut_rashi, fut_nak, fut_deg = get_planet_data(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
@@ -92,9 +105,14 @@ def run_tracker():
                        f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
                        f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
                 
+                # ટેલિગ્રામ અને કેલેન્ડર બંને માટે
                 requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
+                create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
-                print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
+                
+                # ટર્મિનલમાં આઉટપુટ જોવા માટે
+                print(msg)
+                print(f"✅ એલર્ટ અને કેલેન્ડર ઇવેન્ટ મોકલાઈ: {alert_id}")
 
 if __name__ == "__main__":
     run_tracker()
