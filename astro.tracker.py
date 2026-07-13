@@ -77,7 +77,7 @@ def run_tracker():
         c_rasi, c_rd, c_nak, c_nd, c_pada = get_astro_position(p_id, now)
         entry_time, exit_time, target_entry = None, None, None
         
-        for i in range(1, 1440):
+        for i in range(1, 2880):
             future = now + timedelta(minutes=i)
             _, _, f_nak, _, f_pada = get_astro_position(p_id, future)
             entry = next((item for item in PUSHKAR_DATA if item["nakshatra"] == f_nak and item["pada"] == f_pada), None)
