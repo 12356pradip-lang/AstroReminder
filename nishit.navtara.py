@@ -42,7 +42,7 @@ def get_times(planet_id, current_n):
     exit_time = None
     
     # -24 થી +24 કલાક સુધી લૂપ
-    for i in range(-24 * 60, 24 * 60, 10):
+    for i in range(-48 * 60, 48 * 60, 10):
         check_time = current_time + timedelta(minutes=i)
         nak = get_nakshatra(planet_id, check_time)
         
