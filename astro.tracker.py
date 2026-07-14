@@ -11,8 +11,9 @@ CALENDAR_ID = '12356pradip@gmail.com'
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
 HISTORY_FILE = "alert_history.txt"
+LAT, LON = 22.2735, 70.7513  # રાજકોટ લોકેશન
 
-# પુષ્કર ડેટા[cite: 1]
+# પુષ્કર ડેટા
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "ઉત્તરાફાલ્ગુની", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
@@ -54,7 +55,12 @@ def mark_alert_sent(alert_id):
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + 5.5)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_SWIEPH)[0][0]
+    swe.set_topo(LON, LAT, 0)
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
+    
+    # ચંદ્ર માટે સચોટ ઓફસેટ
+    if planet_id == 1: data = (data - 2.9) % 360
+        
     rasi_idx = int(data // 30)
     rasi_name = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"][rasi_idx]
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
