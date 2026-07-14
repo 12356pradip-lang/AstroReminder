@@ -30,3 +30,4 @@ jobs:
           python astro.tracker.py
           python navtara.tracker.py
           python nishit.navtara.py
+          python uttarabhadrapad.tracker.py
