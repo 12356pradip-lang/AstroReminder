@@ -62,12 +62,12 @@ def get_transition_times(planet_id):
     start = datetime.utcnow()
     current_n = get_planet_data(planet_id, start)[1]
     entry, exit_time = None, None
-    for i in range(0, 48 * 60, 10):
+    for i in range(0, 48 * 60, 1):
         t = start + timedelta(minutes=i)
         if get_planet_data(planet_id, t)[1] != current_n:
             exit_time = t + timedelta(hours=5, minutes=30)
             break
-    for i in range(0, -48 * 60, -10):
+    for i in range(0, -48 * 60, -1):
         t = start + timedelta(minutes=i)
         if get_planet_data(planet_id, t)[1] != current_n:
             entry = t + timedelta(hours=5, minutes=30)
