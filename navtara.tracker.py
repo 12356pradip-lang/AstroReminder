@@ -40,9 +40,7 @@ def create_calendar_event(summary, description):
         return False
 
 def get_dms(deg):
-    d = int(deg)
-    m = int((deg - d) * 60)
-    s = int((((deg - d) * 60) - m) * 60)
+    d = int(deg); m = int((deg - d) * 60); s = int((((deg - d) * 60) - m) * 60)
     return f"{d}°{m}'{s}\""
 
 def get_planet_data(planet_id, time):
@@ -62,12 +60,12 @@ def get_transition_times(planet_id):
     start = datetime.utcnow()
     current_n = get_planet_data(planet_id, start)[1]
     entry, exit_time = None, None
-    for i in range(0, 48 * 60, 10):
+    for i in range(0, 48 * 60, 1):
         t = start + timedelta(minutes=i)
         if get_planet_data(planet_id, t)[1] != current_n:
             exit_time = t + timedelta(hours=5, minutes=30)
             break
-    for i in range(0, -48 * 60, -10):
+    for i in range(0, -48 * 60, -1):
         t = start + timedelta(minutes=i)
         if get_planet_data(planet_id, t)[1] != current_n:
             entry = t + timedelta(hours=5, minutes=30)
@@ -76,27 +74,22 @@ def get_transition_times(planet_id):
 
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): return False
-    with open(HISTORY_FILE, "r") as f:
-        return alert_id in f.read().splitlines()
+    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
 
 def mark_alert_sent(alert_id):
-    with open(HISTORY_FILE, "a") as f:
-        f.write(alert_id + "\n")
+    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     now = datetime.utcnow()
     future_time = now + timedelta(hours=12)
-    
     for p_id, p_name in planets.items():
         cur_rashi, cur_nak, cur_deg = get_planet_data(p_id, now)
         fut_rashi, fut_nak, fut_deg = get_planet_data(p_id, future_time)
-        
         for tara, naks in NAVTARA_DATA.items():
             if fut_nak in naks:
-                alert_id = f"{p_name}_{fut_nak}_{datetime.now().strftime('%Y%m%d')}"
+                alert_id = f"{p_name}_{fut_nak}_{datetime.now().strftime('%Y%m%d_%H')}"
                 if is_alert_sent(alert_id): continue
-                
                 entry, exit_t = get_transition_times(p_id)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
                        f"---------------------------\n"
@@ -104,15 +97,12 @@ def run_tracker():
                        f"ભવિષ્યનું નક્ષત્ર: {fut_nak}\n"
                        f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
                        f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
-                
-                # ટેલિગ્રામ અને કેલેન્ડર બંને માટે
                 requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
                 create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
-                
-                # ટર્મિનલમાં આઉટપુટ જોવા માટે
                 print(msg)
                 print(f"✅ એલર્ટ અને કેલેન્ડર ઇવેન્ટ મોકલાઈ: {alert_id}")
+                break
 
 if __name__ == "__main__":
     run_tracker()
