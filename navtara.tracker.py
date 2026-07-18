@@ -83,13 +83,17 @@ def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     now = datetime.utcnow()
     future_time = now + timedelta(hours=12)
+    
     for p_id, p_name in planets.items():
         cur_rashi, cur_nak, cur_deg = get_planet_data(p_id, now)
         fut_rashi, fut_nak, fut_deg = get_planet_data(p_id, future_time)
+        
+        # Unique ID માત્ર તારીખ અને નક્ષત્ર પર આધારિત
+        alert_id = f"{p_name}_{fut_nak}_{now.strftime('%Y%m%d')}"
+        if is_alert_sent(alert_id): continue
+
         for tara, naks in NAVTARA_DATA.items():
             if fut_nak in naks:
-                alert_id = f"{p_name}_{fut_nak}_{datetime.now().strftime('%Y%m%d_%H')}"
-                if is_alert_sent(alert_id): continue
                 entry, exit_t = get_transition_times(p_id)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
                        f"---------------------------\n"
@@ -97,9 +101,11 @@ def run_tracker():
                        f"ભવિષ્યનું નક્ષત્ર: {fut_nak}\n"
                        f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
                        f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
+                
                 requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
                 create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
+                
                 print(msg)
                 print(f"✅ એલર્ટ અને કેલેન્ડર ઇવેન્ટ મોકલાઈ: {alert_id}")
                 break
