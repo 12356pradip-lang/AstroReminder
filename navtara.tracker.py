@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 import swisseph as swe
 import requests
 import os
-import urllib.parse  # ટેલિગ્રામ એલર્ટ માટે નવું અપડેટ
+import urllib.parse
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
@@ -74,24 +74,39 @@ def get_transition_times(planet_id):
     return entry, exit_time
 
 def is_alert_sent(alert_id):
-    if not os.path.exists(HISTORY_FILE): return False
-    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
+    if not os.path.exists(HISTORY_FILE): 
+        return False
+    try:
+        with open(HISTORY_FILE, "r") as f:
+            history = [line.strip() for line in f.readlines() if line.strip()]
+            return alert_id.strip() in history
+    except Exception as e:
+        print(f"Read Error: {e}")
+        return False
 
 def mark_alert_sent(alert_id):
-    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
+    try:
+        with open(HISTORY_FILE, "a") as f: 
+            f.write(alert_id.strip() + "\n")
+        print(f"✅ ઇતિહાસમાં નોંધાયું: {alert_id}")
+    except Exception as e:
+        print(f"Write Error: {e}")
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     now = datetime.utcnow()
     future_time = now + timedelta(hours=12)
+    # યુનિક આઈડી માટે કલાકનો ઉપયોગ
+    current_hour_id = now.strftime('%Y%m%d_%H')
     
     for p_id, p_name in planets.items():
         cur_rashi, cur_nak, cur_deg = get_planet_data(p_id, now)
-        fut_rashi, fut_nak, fut_deg = get_planet_data(p_id, future_time)
+        _, fut_nak, _ = get_planet_data(p_id, future_time)
         
-        # Unique ID માત્ર તારીખ અને નક્ષત્ર પર આધારિત
-        alert_id = f"{p_name}_{fut_nak}_{now.strftime('%Y%m%d')}"
-        if is_alert_sent(alert_id): continue
+        alert_id = f"{p_name}_{fut_nak}_{current_hour_id}"
+        if is_alert_sent(alert_id):
+            print(f"⚠️ આ એલર્ટ પહેલેથી મોકલાઈ ગયું છે: {alert_id}")
+            continue
 
         for tara, naks in NAVTARA_DATA.items():
             if fut_nak in naks:
@@ -103,7 +118,6 @@ def run_tracker():
                        f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
                        f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
                 
-                # અપડેટેડ ટેલિગ્રામ એલર્ટ ફંક્શન (URL Encoding સાથે)
                 msg_encoded = urllib.parse.quote(msg)
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}"
                 requests.get(url)
