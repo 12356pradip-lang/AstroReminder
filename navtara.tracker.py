@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 import swisseph as swe
 import requests
 import os
+import urllib.parse  # ટેલિગ્રામ એલર્ટ માટે નવું અપડેટ
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
@@ -102,7 +103,11 @@ def run_tracker():
                        f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
                        f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
                 
-                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
+                # અપડેટેડ ટેલિગ્રામ એલર્ટ ફંક્શન (URL Encoding સાથે)
+                msg_encoded = urllib.parse.quote(msg)
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}"
+                requests.get(url)
+                
                 create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
                 
