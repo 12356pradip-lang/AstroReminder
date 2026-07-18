@@ -1,6 +1,7 @@
 import swisseph as swe
 import requests
 import os
+import urllib.parse
 from datetime import datetime, timedelta
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
@@ -10,7 +11,7 @@ SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
-HISTORY_FILE = "alert_history.txt"
+HISTORY_FILE = "astro_alert_history.txt" # અપડેટેડ ફાઈલ નામ
 LAT, LON = 22.2735, 70.7513  # રાજકોટ લોકેશન
 
 # પુષ્કર ડેટા
@@ -57,10 +58,7 @@ def get_astro_position(planet_id, target_time):
     jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + 5.5)
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
-    
-    # ચંદ્ર માટે સચોટ ઓફસેટ
     if planet_id == 1: data = (data - 2.9) % 360
-        
     rasi_idx = int(data // 30)
     rasi_name = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"][rasi_idx]
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
@@ -98,8 +96,11 @@ def run_tracker():
                        f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
                        f"આ પદની નાવંશ રાશિ {target_entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {target_entry['mul_tatva']} છે.\n"
                        f"નાવંશ તત્વ {target_entry['nav_tatva']} છે અને પ્રધાન તત્વ {target_entry['pradhan']} છે.")
+                
                 print(msg)
-                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
+                # ટેલિગ્રામ માટે URL encoding
+                msg_encoded = urllib.parse.quote(msg)
+                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
                 create_calendar_event(f"પુષ્કર: {name}", msg)
                 mark_alert_sent(alert_id)
 
