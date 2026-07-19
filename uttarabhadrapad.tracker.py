@@ -5,7 +5,7 @@ import requests
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
-# કોન્ફિગરેશન (સિક્યોરિટી માટે Environment Variables નો ઉપયોગ)
+# કોન્ફિગરેશન
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
 SERVICE_ACCOUNT_FILE = 'credentials.json'
@@ -19,11 +19,12 @@ def create_calendar_event(summary, description):
         if not os.path.exists(SERVICE_ACCOUNT_FILE): return False
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
+        now = datetime.now()
         event = {
             'summary': summary,
             'description': description,
-            'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'},
-            'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
+            'start': {'dateTime': now.isoformat() + 'Z'},
+            'end': {'dateTime': (now + timedelta(hours=1)).isoformat() + 'Z'},
         }
         service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         return True
@@ -37,7 +38,8 @@ def format_dms(deg):
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + 5.5)
+    # અહીં પણ local time મુજબ ગણતરી થાય છે
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0)
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
     if planet_id == 1: data = (data - 2.9) % 360
@@ -51,17 +53,17 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nak_name
 
 def get_transition_details(p_id, target_nak):
-    start = datetime.utcnow()
+    start = datetime.now()
     for i in range(0, 48 * 60, 15):
         t = start + timedelta(minutes=i)
         r_name, r_deg, n_name = get_astro_position(p_id, t)
         if n_name == target_nak:
-            entry_time = t + timedelta(hours=5, minutes=30)
+            entry_time = t
             for j in range(i, 48 * 60, 15):
                 t_exit = start + timedelta(minutes=j)
                 _, _, n_exit = get_astro_position(p_id, t_exit)
                 if n_exit != target_nak:
-                    exit_time = t_exit + timedelta(hours=5, minutes=30)
+                    exit_time = t_exit
                     return entry_time, exit_time, r_name, r_deg
             break
     return None, None, None, None
@@ -72,7 +74,8 @@ def run_tracker():
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         entry_t, exit_t, rasi, deg = get_transition_details(p_id, target_nak)
         
-        if entry_t and entry_t > datetime.utcnow() and entry_t < (datetime.utcnow() + timedelta(hours=24)):
+        now = datetime.now()
+        if entry_t and entry_t > now and entry_t < (now + timedelta(hours=24)):
             alert_id = f"{target_nak}_{name}_{entry_t.strftime('%Y%m%d_%H')}"
             
             already_sent = False
@@ -87,7 +90,6 @@ def run_tracker():
                        f"પ્રવેશ સ્થિતિ: {rasi} રાશિમાં {format_dms(deg)}\n"
                        f"નિર્ગમન સમય: {exit_t.strftime('%d %b, %H:%M')}")
                 
-                # ટેલિગ્રામ અને કેલેન્ડર અપડેટ
                 if TELEGRAM_TOKEN:
                     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
                 create_calendar_event(f"નવતારા: {target_nak}", msg)
