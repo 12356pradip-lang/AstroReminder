@@ -72,7 +72,7 @@ def run_tracker():
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         entry_t, exit_t, rasi, deg = get_transition_details(p_id, target_nak)
         
-        if entry_t and entry_t > datetime.now() and entry_t < (datetime.now() + timedelta(hours=24)):
+        if entry_t and entry_t > datetime.utcnow() and entry_t < (datetime.utcnow() + timedelta(hours=24)):
             alert_id = f"{target_nak}_{name}_{entry_t.strftime('%Y%m%d_%H')}"
             
             already_sent = False
