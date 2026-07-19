@@ -36,5 +36,5 @@ jobs:
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git add alert_history.txt astro_alert_history.txt pushkar_specials_history.txt
+          git add alert_history.txt astro_alert_history.txt pushkar_specials_history.txt nishit_history.txt
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update alert history file" && git push)
