@@ -57,21 +57,29 @@ def get_planet_data(planet_id, time):
     nak = naks[int(data // 13.333333333333334) % 27]
     return rashi, nak, get_dms(degree_in_rashi)
 
-def get_transition_times(planet_id):
+def get_transition_times(planet_id, target_nak):
     start = datetime.utcnow()
-    current_n = get_planet_data(planet_id, start)[1]
-    entry, exit_time = None, None
-    for i in range(0, 48 * 60, 1):
-        t = start + timedelta(minutes=i)
-        if get_planet_data(planet_id, t)[1] != current_n:
-            exit_time = t + timedelta(hours=5, minutes=30)
+    # Fine-tuning logic: 1 કલાકના સ્ટેપમાં શોધવું અને જેવું નક્ષત્ર મળે, 1 મિનિટના સ્ટેપમાં કન્ફર્મ કરવું
+    entry_time = None
+    exit_time = None
+    
+    # પ્રવેશ સમય શોધવા માટે (આગળના 24 કલાક)
+    for i in range(0, 24 * 60, 60):
+        t_check = start + timedelta(minutes=i)
+        if get_planet_data(planet_id, t_check)[1] == target_nak:
+            # પ્રવેશ મળી ગયો, હવે સચોટ સમય માટે પાછળ જાઓ
+            for j in range(max(0, i-60), i):
+                t_fine = start + timedelta(minutes=j)
+                if get_planet_data(planet_id, t_fine)[1] == target_nak:
+                    entry_time = t_fine + timedelta(hours=5, minutes=30)
+                    # હવે નિર્ગમન શોધવા માટે
+                    for k in range(j, j + 48 * 60):
+                        t_exit = start + timedelta(minutes=k)
+                        if get_planet_data(planet_id, t_exit)[1] != target_nak:
+                            exit_time = t_exit + timedelta(hours=5, minutes=30)
+                            return entry_time, exit_time
             break
-    for i in range(0, -48 * 60, -1):
-        t = start + timedelta(minutes=i)
-        if get_planet_data(planet_id, t)[1] != current_n:
-            entry = t + timedelta(hours=5, minutes=30)
-            break
-    return entry, exit_time
+    return None, None
 
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): 
@@ -96,7 +104,6 @@ def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     now = datetime.utcnow()
     future_time = now + timedelta(hours=12)
-    # યુનિક આઈડી માટે કલાકનો ઉપયોગ
     current_hour_id = now.strftime('%Y%m%d_%H')
     
     for p_id, p_name in planets.items():
@@ -105,12 +112,11 @@ def run_tracker():
         
         alert_id = f"{p_name}_{fut_nak}_{current_hour_id}"
         if is_alert_sent(alert_id):
-            print(f"⚠️ આ એલર્ટ પહેલેથી મોકલાઈ ગયું છે: {alert_id}")
             continue
 
         for tara, naks in NAVTARA_DATA.items():
             if fut_nak in naks:
-                entry, exit_t = get_transition_times(p_id)
+                entry, exit_t = get_transition_times(p_id, fut_nak)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
                        f"---------------------------\n"
                        f"વર્તમાન સ્થિતિ: {cur_rashi}, {cur_nak} ({cur_deg})\n"
@@ -124,9 +130,7 @@ def run_tracker():
                 
                 create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
-                
                 print(msg)
-                print(f"✅ એલર્ટ અને કેલેન્ડર ઇવેન્ટ મોકલાઈ: {alert_id}")
                 break
 
 if __name__ == "__main__":
