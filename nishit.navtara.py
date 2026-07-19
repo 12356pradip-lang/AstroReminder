@@ -33,29 +33,29 @@ def get_nakshatra(planet_id, target_time):
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
     nak_idx = int(data // 13.333333333333334)
-    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
+    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
     return nakshatras[nak_idx % 27]
 
-def get_fine_times(planet_id, target_nak):
+    def get_fine_times(planet_id, target_nak):
+    # સૂર્ય માટે 15 દિવસ (360 કલાક), ચંદ્ર માટે 3 દિવસ (72 કલાક)
+    search_hours = 360 if planet_id == 0 else 72
     start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-    # પ્રવેશ માટે શોધો
-    for i in range(0, 48 * 60, 60):
+    
+    for i in range(0, search_hours * 60, 60):
         t_check = start + timedelta(minutes=i)
         if get_nakshatra(planet_id, t_check) == target_nak:
-            # પ્રવેશ મળી ગયો, 1 મિનિટના સ્ટેપમાં ચોકસાઈ કરો
-            for j in range(max(0, i-60), i):
+            for j in range(max(0, i-60), i + 120):
                 t_fine = start + timedelta(minutes=j)
                 if get_nakshatra(planet_id, t_fine) == target_nak:
                     entry = t_fine
-                    # નિર્ગમન શોધો
-                    for k in range(j, j + 48 * 60):
+                    for k in range(j, j + search_hours * 60):
                         t_exit = start + timedelta(minutes=k)
                         if get_nakshatra(planet_id, t_exit) != target_nak:
                             return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
             break
     return "N/A", "N/A"
 
-def run_tracker():
+    def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
     current_hour_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H')

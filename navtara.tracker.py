@@ -1,18 +1,13 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import swisseph as swe
 import requests
 import os
 import urllib.parse
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
 
-# કોન્ફિગરેશન
-SERVICE_ACCOUNT_FILE = 'credentials.json'
-CALENDAR_ID = '12356pradip@gmail.com'
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-LAT, LON = 22.2735, 70.7513
+# --- કોન્ફિગરેશન ---
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
+LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "alert_history.txt"
 
 NAVTARA_DATA = {
@@ -24,113 +19,67 @@ NAVTARA_DATA = {
     "અતિ મૈત્રી તારા": ["પૂર્વાષાઢા", "ભરણી", "પૂર્વા ફાલ્ગુની"]
 }
 
-def create_calendar_event(summary, description):
-    try:
-        creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
-        service = build('calendar', 'v3', credentials=creds)
-        event = {
-            'summary': summary,
-            'description': description,
-            'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'},
-            'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'},
-        }
-        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-        return True
-    except Exception as e:
-        print(f"❌ કેલેન્ડર એરર: {e}")
-        return False
-
-def get_dms(deg):
-    d = int(deg); m = int((deg - d) * 60); s = int((((deg - d) * 60) - m) * 60)
-    return f"{d}°{m}'{s}\""
-
-def get_planet_data(planet_id, time):
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(time.year, time.month, time.day, time.hour + time.minute/60.0 + 5.5)
-    swe.set_topo(LON, LAT, 0)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
-    if planet_id == 1: data = (data - 2.9) % 360
-    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
-    rashi = rashis[int(data // 30)]
-    degree_in_rashi = data % 30
-    naks = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    nak = naks[int(data // 13.333333333333334) % 27]
-    return rashi, nak, get_dms(degree_in_rashi)
-
-def get_transition_times(planet_id, target_nak):
-    start = datetime.utcnow()
-    # Fine-tuning logic: 1 કલાકના સ્ટેપમાં શોધવું અને જેવું નક્ષત્ર મળે, 1 મિનિટના સ્ટેપમાં કન્ફર્મ કરવું
-    entry_time = None
-    exit_time = None
-    
-    # પ્રવેશ સમય શોધવા માટે (આગળના 24 કલાક)
-    for i in range(0, 24 * 60, 60):
-        t_check = start + timedelta(minutes=i)
-        if get_planet_data(planet_id, t_check)[1] == target_nak:
-            # પ્રવેશ મળી ગયો, હવે સચોટ સમય માટે પાછળ જાઓ
-            for j in range(max(0, i-60), i):
-                t_fine = start + timedelta(minutes=j)
-                if get_planet_data(planet_id, t_fine)[1] == target_nak:
-                    entry_time = t_fine + timedelta(hours=5, minutes=30)
-                    # હવે નિર્ગમન શોધવા માટે
-                    for k in range(j, j + 48 * 60):
-                        t_exit = start + timedelta(minutes=k)
-                        if get_planet_data(planet_id, t_exit)[1] != target_nak:
-                            exit_time = t_exit + timedelta(hours=5, minutes=30)
-                            return entry_time, exit_time
-            break
-    return None, None
-
 def is_alert_sent(alert_id):
-    if not os.path.exists(HISTORY_FILE): 
-        return False
-    try:
-        with open(HISTORY_FILE, "r") as f:
-            history = [line.strip() for line in f.readlines() if line.strip()]
-            return alert_id.strip() in history
-    except Exception as e:
-        print(f"Read Error: {e}")
-        return False
+    if not os.path.exists(HISTORY_FILE): return False
+    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
 
 def mark_alert_sent(alert_id):
-    try:
-        with open(HISTORY_FILE, "a") as f: 
-            f.write(alert_id.strip() + "\n")
-        print(f"✅ ઇતિહાસમાં નોંધાયું: {alert_id}")
-    except Exception as e:
-        print(f"Write Error: {e}")
+    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
+
+def get_nakshatra(planet_id, target_time):
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, 
+                    target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
+    swe.set_topo(LON, LAT, 0)
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
+    nak_idx = int(data // 13.333333333333334)
+    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+    return nakshatras[nak_idx % 27]
+
+def get_fine_times(planet_id, target_nak):
+    # સૂર્ય માટે 15 દિવસ (360 કલાક), ચંદ્ર માટે 3 દિવસ (72 કલાક)
+    search_hours = 360 if planet_id == 0 else 72
+    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    
+    # પ્રવેશ માટે શોધો
+    for i in range(0, search_hours * 60, 60):
+        t_check = start + timedelta(minutes=i)
+        if get_nakshatra(planet_id, t_check) == target_nak:
+            for j in range(max(0, i-60), i + 120):
+                t_fine = start + timedelta(minutes=j)
+                if get_nakshatra(planet_id, t_fine) == target_nak:
+                    entry = t_fine
+                    # નિર્ગમન શોધવા માટે સમાન ગાળો
+                    for k in range(j, j + search_hours * 60):
+                        t_exit = start + timedelta(minutes=k)
+                        if get_nakshatra(planet_id, t_exit) != target_nak:
+                            return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+            break
+    return "N/A", "N/A"
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
-    now = datetime.utcnow()
-    future_time = now + timedelta(hours=12)
-    current_hour_id = now.strftime('%Y%m%d_%H')
-    
-    for p_id, p_name in planets.items():
-        cur_rashi, cur_nak, cur_deg = get_planet_data(p_id, now)
-        _, fut_nak, _ = get_planet_data(p_id, future_time)
-        
-        alert_id = f"{p_name}_{fut_nak}_{current_hour_id}"
-        if is_alert_sent(alert_id):
-            continue
+    future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
+    current_hour_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H')
 
+    for p_id, p_name in planets.items():
+        fut_n = get_nakshatra(p_id, future_time)
+        
         for tara, naks in NAVTARA_DATA.items():
-            if fut_nak in naks:
-                entry, exit_t = get_transition_times(p_id, fut_nak)
+            if fut_n in naks:
+                alert_id = f"{p_name}_{fut_n}_{current_hour_id}"
+                if is_alert_sent(alert_id): continue
+                
+                entry, exit_t = get_fine_times(p_id, fut_n)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
-                       f"---------------------------\n"
-                       f"વર્તમાન સ્થિતિ: {cur_rashi}, {cur_nak} ({cur_deg})\n"
-                       f"ભવિષ્યનું નક્ષત્ર: {fut_nak}\n"
-                       f"પ્રવેશ: {entry.strftime('%H:%M, %d %b') if entry else 'N/A'}\n"
-                       f"નિર્ગમન: {exit_t.strftime('%H:%M, %d %b') if exit_t else 'N/A'}")
+                       f"નક્ષત્ર: {fut_n}\n"
+                       f"પ્રવેશ: {entry}\n"
+                       f"નિર્ગમન: {exit_t}")
                 
-                msg_encoded = urllib.parse.quote(msg)
-                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}"
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
                 requests.get(url)
-                
-                create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
-                print(msg)
+                print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
                 break
 
 if __name__ == "__main__":
