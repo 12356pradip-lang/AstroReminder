@@ -11,10 +11,9 @@ SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
-HISTORY_FILE = "astro_alert_history.txt" # અપડેટેડ ફાઈલ નામ
-LAT, LON = 22.2735, 70.7513  # રાજકોટ લોકેશન
+HISTORY_FILE = "astro_alert_history.txt"
+LAT, LON = 22.2735, 70.7513
 
-# પુષ્કર ડેટા
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "ઉત્તરાફાલ્ગુની", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
@@ -46,13 +45,6 @@ def format_dms(deg):
     d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
 
-def is_alert_sent(alert_id):
-    if not os.path.exists(HISTORY_FILE): return False
-    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
-
-def mark_alert_sent(alert_id):
-    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
-
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
     jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + 5.5)
@@ -65,6 +57,35 @@ def get_astro_position(planet_id, target_time):
     nak_idx = int(data // 13.333333333333334)
     pada = int((data % 13.333333333333334) // 3.3333333333333335) + 1
     return rasi_name, data % 30, nakshatras[nak_idx % 27], data % 13.333333333333334, pada
+
+def get_fine_transition(p_id, target_entry):
+    start = datetime.utcnow()
+    # 1 કલાકના ગાળે શોધો
+    for i in range(0, 24 * 60, 60):
+        t_check = start + timedelta(minutes=i)
+        _, _, n, _, p = get_astro_position(p_id, t_check)
+        if n == target_entry["nakshatra"] and p == target_entry["pada"]:
+            # પ્રવેશ મળી ગયો, હવે 1-મિનિટની ચોકસાઈથી પાછળનું સ્ટેપ શોધો
+            for j in range(max(0, i-60), i):
+                t_fine = start + timedelta(minutes=j)
+                _, _, n_f, _, p_f = get_astro_position(p_id, t_fine)
+                if n_f == target_entry["nakshatra"] and p_f == target_entry["pada"]:
+                    entry_t = t_fine + timedelta(hours=5, minutes=30)
+                    # હવે નિર્ગમન શોધો
+                    for k in range(j, j + 48 * 60):
+                        t_exit = start + timedelta(minutes=k)
+                        _, _, n_e, _, p_e = get_astro_position(p_id, t_exit)
+                        if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
+                            return entry_t, t_exit + timedelta(hours=5, minutes=30)
+            break
+    return None, None
+
+def is_alert_sent(alert_id):
+    if not os.path.exists(HISTORY_FILE): return False
+    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
+
+def mark_alert_sent(alert_id):
+    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
 def create_calendar_event(summary, description):
     try:
@@ -79,30 +100,23 @@ def run_tracker():
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         now = datetime.utcnow()
         c_rasi, c_rd, c_nak, c_nd, c_pada = get_astro_position(p_id, now)
-        entry_time, exit_time, target_entry = None, None, None
         
-        for i in range(1, 2880):
-            future = now + timedelta(minutes=i)
-            _, _, f_nak, _, f_pada = get_astro_position(p_id, future)
-            entry = next((item for item in PUSHKAR_DATA if item["nakshatra"] == f_nak and item["pada"] == f_pada), None)
-            if entry and not entry_time: entry_time, target_entry = future, entry
-            if entry_time and not entry and not exit_time: exit_time = future; break
-        
-        if entry_time and exit_time:
-            alert_id = f"{name}_{target_entry['nakshatra']}_{target_entry['pada']}_{entry_time.strftime('%Y%m%d_%H')}"
-            if not is_alert_sent(alert_id):
-                msg = (f"એડવાન્સ એલર્ટ: {name}\nહાલ {c_rasi} રાશિમાં {format_dms(c_rd)} પર {c_nak} નક્ષત્રમાં {format_dms(c_nd)} પર છે.\n"
-                       f"જે આગામી {entry_time.strftime('%H:%M, %d %b')} ના રોજ પુષ્કર નાવંશ {target_entry['nakshatra']} નક્ષત્રના {target_entry['pada']} પદમાં પ્રવેશ કરશે.\n"
-                       f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
-                       f"આ પદની નાવંશ રાશિ {target_entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {target_entry['mul_tatva']} છે.\n"
-                       f"નાવંશ તત્વ {target_entry['nav_tatva']} છે અને પ્રધાન તત્વ {target_entry['pradhan']} છે.")
-                
-                print(msg)
-                # ટેલિગ્રામ માટે URL encoding
-                msg_encoded = urllib.parse.quote(msg)
-                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
-                create_calendar_event(f"પુષ્કર: {name}", msg)
-                mark_alert_sent(alert_id)
+        for entry in PUSHKAR_DATA:
+            entry_time, exit_time = get_fine_transition(p_id, entry)
+            if entry_time and exit_time:
+                alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{entry_time.strftime('%Y%m%d_%H')}"
+                if not is_alert_sent(alert_id):
+                    msg = (f"એડવાન્સ એલર્ટ: {name}\nહાલ {c_rasi} રાશિમાં {format_dms(c_rd)} પર {c_nak} નક્ષત્રમાં {format_dms(c_nd)} પર છે.\n"
+                           f"જે આગામી {entry_time.strftime('%H:%M, %d %b')} ના રોજ પુષ્કર નાવંશ {entry['nakshatra']} નક્ષત્રના {entry['pada']} પદમાં પ્રવેશ કરશે.\n"
+                           f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
+                           f"આ પદની નાવંશ રાશિ {entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {entry['mul_tatva']} છે.\n"
+                           f"નાવંશ તત્વ {entry['nav_tatva']} છે અને પ્રધાન તત્વ {entry['pradhan']} છે.")
+                    print(msg)
+                    msg_encoded = urllib.parse.quote(msg)
+                    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
+                    create_calendar_event(f"પુષ્કર: {name}", msg)
+                    mark_alert_sent(alert_id)
+                    break
 
 if __name__ == "__main__":
     run_tracker()
