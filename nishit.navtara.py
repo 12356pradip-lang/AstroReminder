@@ -1,11 +1,14 @@
 from datetime import datetime, timedelta, timezone
 import swisseph as swe
 import requests
+import os
+import urllib.parse
 
 # --- કોન્ફિગરેશન ---
 TELEGRAM_TOKEN = "8795156986:AAGoUEF_izKhD91Nhv6UbkshUBS3YQcT8"
 TELEGRAM_CHAT_ID = "8713489324"
 LAT, LON = 22.2735, 70.7513
+HISTORY_FILE = "nishit_history.txt"
 
 NAVTARA_DATA = {
     "જન્મ તારા": ["અશ્વિની", "મઘા", "મૂલા"],
@@ -19,61 +22,66 @@ NAVTARA_DATA = {
     "પરમ મિત્ર તારા": ["આશ્લેષા", "જ્યેષ્ઠા", "રેવતી"]
 }
 
-def send_telegram_msg(text):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={text}"
-    requests.get(url)
+def is_alert_sent(alert_id):
+    if not os.path.exists(HISTORY_FILE): return False
+    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
+
+def mark_alert_sent(alert_id):
+    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
 def get_nakshatra(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    # IST ઓફસેટ માટે 5.5 કલાક ઉમેરેલા છે
     jd = swe.julday(target_time.year, target_time.month, target_time.day, 
                     target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
-    
     nak_idx = int(data // 13.333333333333334)
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂલા", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદા", "ઉત્તરા ભાદ્રપદા", "રેવતી"]
-    return nakshatras[nak_idx]
+    return nakshatras[nak_idx % 27]
 
-def get_times(planet_id, current_n):
-    # IST મુજબ વર્તમાન સમય
-    current_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-    entry_time = None
-    exit_time = None
-    
-    # -24 થી +24 કલાક સુધી લૂપ
-    for i in range(-48 * 60, 48 * 60, 10):
-        check_time = current_time + timedelta(minutes=i)
-        nak = get_nakshatra(planet_id, check_time)
-        
-        if nak == current_n:
-            if entry_time is None: entry_time = check_time
-        elif entry_time is not None and exit_time is None:
-            exit_time = check_time
+def get_fine_times(planet_id, target_nak):
+    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    # પ્રવેશ માટે શોધો
+    for i in range(0, 48 * 60, 60):
+        t_check = start + timedelta(minutes=i)
+        if get_nakshatra(planet_id, t_check) == target_nak:
+            # પ્રવેશ મળી ગયો, 1 મિનિટના સ્ટેપમાં ચોકસાઈ કરો
+            for j in range(max(0, i-60), i):
+                t_fine = start + timedelta(minutes=j)
+                if get_nakshatra(planet_id, t_fine) == target_nak:
+                    entry = t_fine
+                    # નિર્ગમન શોધો
+                    for k in range(j, j + 48 * 60):
+                        t_exit = start + timedelta(minutes=k)
+                        if get_nakshatra(planet_id, t_exit) != target_nak:
+                            return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
             break
-            
-    entry_str = entry_time.strftime("%d %b %H:%M") if entry_time else "N/A"
-    exit_str = exit_time.strftime("%d %b %H:%M") if exit_time else "N/A"
-            
-    return entry_str, exit_str
+    return "N/A", "N/A"
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
-    # IST મુજબ ફ્યુચર સમય
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
+    current_hour_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
-        entry, exit_t = get_times(p_id, fut_n)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
+                alert_id = f"{p_name}_{fut_n}_{current_hour_id}"
+                if is_alert_sent(alert_id): continue
+                
+                entry, exit_t = get_fine_times(p_id, fut_n)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
                        f"નક્ષત્ર: {fut_n}\n"
                        f"પ્રવેશ: {entry}\n"
                        f"નિર્ગમન: {exit_t}")
-                send_telegram_msg(msg)
-                print(f"✅ એલર્ટ મોકલાયું:\n{msg}")
+                
+                url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
+                requests.get(url)
+                mark_alert_sent(alert_id)
+                print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
+                break
 
 if __name__ == "__main__":
     run_tracker()
