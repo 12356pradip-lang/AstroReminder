@@ -9,8 +9,8 @@ from google.oauth2 import service_account
 # કોન્ફિગરેશન
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
+TELEGRAM_CHAT_ID = "478006282"
 HISTORY_FILE = "astro_alert_history.txt" # અપડેટેડ ફાઈલ નામ
 LAT, LON = 22.2735, 70.7513  # રાજકોટ લોકેશન
 

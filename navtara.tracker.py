@@ -11,8 +11,8 @@ SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 LAT, LON = 22.2735, 70.7513
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
+TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
+TELEGRAM_CHAT_ID = "478006282"
 HISTORY_FILE = "alert_history.txt"
 
 NAVTARA_DATA = {
