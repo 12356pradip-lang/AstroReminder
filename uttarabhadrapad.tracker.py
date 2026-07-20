@@ -77,7 +77,7 @@ def run_tracker():
     target_nak = ["આશ્લેષા", "મઘા", "જ્યેષ્ઠા", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
-        entry_t, exit_t, rasi, deg = get_transition_details(p_id, target_nak)
+        entry_t, exit_t, rasi, deg = get_fine_times(p_id, target_nak)
         
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         if entry_t and entry_t > now and entry_t < (now + timedelta(hours=24)):
