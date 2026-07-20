@@ -56,10 +56,10 @@ def get_fine_times(planet_id, target_nak):
     # આ return લૂપની બિલકુલ બહાર હોવું જોઈએ, જે ફંક્શનને "N/A" આપવા માટે કહેશે
     return "N/A", "N/A"
 
-    def run_tracker():
-        planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
-        future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
-        current_hour_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H')
+def run_tracker():
+    planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
+    future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
+    current_hour_id = datetime.now(timezone.utc).strftime('%Y%m%d_%H')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
