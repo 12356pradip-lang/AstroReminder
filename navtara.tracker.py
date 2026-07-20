@@ -96,7 +96,6 @@ def get_fine_times(planet_id, target_nak):
     return "N/A", "N/A"
 
 def run_tracker():
-    print("DEBUG: Tracker રન થઈ રહ્યો છે...") # આ લાઈન ઉમેરો
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
     # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
@@ -104,6 +103,7 @@ def run_tracker():
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
+        print(f"DEBUG: અત્યારે {p_name} નું નક્ષત્ર {fut_n} છે.") # આ લાઈન ઉમેરો
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
