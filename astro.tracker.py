@@ -61,23 +61,29 @@ def get_astro_position(planet_id, target_time):
 def get_fine_transition(p_id, target_entry):
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     
-    # 1 મિનિટના ગેપ સાથે લૂપ
     for i in range(0, 24 * 60): 
         t_check = start + timedelta(minutes=i)
         
-        # get_astro_position 3 જ વેલ્યુ આપે છે: રાશિ, ડિગ્રી, નક્ષત્ર
-        rasi, deg, n = get_astro_position(p_id, t_check)
+        # બધી જ વેલ્યુઝ 'data' માં લઈ લો
+        data = get_astro_position(p_id, t_check)
         
-        # ડિગ્રી પરથી પદ (Pada) ગણતરી (1 નક્ષત્ર = 13.33 ડિગ્રી, 1 પદ = 3.33 ડિગ્રી)
+        # હવે ડેટામાંથી આપણને જોઈએ છે તે રીતે અસાઇન કરો
+        # ધારી લઈએ કે: [રાશિ, ડિગ્રી, નક્ષત્ર] આ ક્રમમાં છે
+        rasi = data[0]
+        deg = data[1]
+        n = data[2]
+        
         p = int(deg / 3.3333333333333335) + 1
         
         if n == target_entry["nakshatra"] and p == target_entry["pada"]:
             entry_t = t_check
             
-            # નિર્ગમન (Exit) શોધવા માટે લૂપ
             for j in range(i + 1, 24 * 60):
                 t_exit = start + timedelta(minutes=j)
-                r_e, d_e, n_e = get_astro_position(p_id, t_exit)
+                # એક્ઝિટ માટે પણ આ જ રીતે
+                data_e = get_astro_position(p_id, t_exit)
+                n_e = data_e[2]
+                d_e = data_e[1]
                 p_e = int(d_e / 3.3333333333333335) + 1
                 
                 if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
