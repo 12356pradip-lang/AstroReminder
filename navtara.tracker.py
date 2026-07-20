@@ -107,7 +107,6 @@ def run_tracker():
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
-        print(f"DEBUG: {p_name} -> {fut_n} ({format_dms(deg)})")
 
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
