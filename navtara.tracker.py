@@ -104,7 +104,7 @@ def run_tracker():
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
         print(f"DEBUG: અત્યારે {p_name} નું નક્ષત્ર {fut_n} છે.") # આ લાઈન ઉમેરો
-        
+
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
                 # યુનિક આઈડીમાં તારીખનો ઉપયોગ
