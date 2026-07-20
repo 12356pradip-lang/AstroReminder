@@ -95,6 +95,29 @@ def get_fine_times(planet_id, target_nak):
     
     return "N/A", "N/A"
 
+def test_calendar_connection():
+    try:
+        print("DEBUG: કેલેન્ડર કનેક્શન ટેસ્ટ શરૂ...")
+        creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        service = build('calendar', 'v3', credentials=creds)
+        
+        event = {
+            'summary': 'Test Event',
+            'description': 'Checking if calendar works',
+            'start': {'dateTime': datetime.now(timezone.utc).isoformat()},
+            'end': {'dateTime': (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat()},
+        }
+        
+        result = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        print(f"✅ સફળ: ટેસ્ટ ઇવેન્ટ બની ગઈ! ID: {result.get('id')}")
+        return True
+    except Exception as e:
+        print(f"❌ કેલેન્ડર એરર: {e}")
+        return False
+
+# રન કરવા માટે આ લાઈન ઉમેરો
+test_calendar_connection()
+
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
