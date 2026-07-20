@@ -59,23 +59,22 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nakshatras[nak_idx % 27], data % 13.333333333333334, pada
 
 def get_fine_transition(p_id, target_entry):
-    # ગણતરી માટે આજના દિવસની શરૂઆત
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
-    for i in range(0, 24 * 60, 60):
+    
+    # 1 મિનિટનો લૂપ - સૌથી સચોટ રીત
+    for i in range(0, 24 * 60): 
         t_check = start + timedelta(minutes=i)
-        _, _, n, _, p = get_astro_position(p_id, t_check)
+        _, _, n, p = get_astro_position(p_id, t_check)
+        
         if n == target_entry["nakshatra"] and p == target_entry["pada"]:
-            for j in range(max(0, i-60), i):
-                t_fine = start + timedelta(minutes=j)
-                _, _, n_f, _, p_f = get_astro_position(p_id, t_fine)
-                if n_f == target_entry["nakshatra"] and p_f == target_entry["pada"]:
-                    entry_t = t_fine + timedelta(hours=5, minutes=30)
-                    for k in range(j, j + 48 * 60):
-                        t_exit = start + timedelta(minutes=k)
-                        _, _, n_e, _, p_e = get_astro_position(p_id, t_exit)
-                        if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
-                            return entry_t, t_exit + timedelta(hours=5, minutes=30)
-            break
+            entry_t = t_check
+            # એન્ટ્રી મળી ગયા પછી, નિર્ગમન માટે આગળ વધવું
+            for j in range(i + 1, 24 * 60):
+                t_exit = start + timedelta(minutes=j)
+                _, _, n_e, p_e = get_astro_position(p_id, t_exit)
+                
+                if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
+                    return entry_t, t_exit
     return None, None
 
 def is_alert_sent(alert_id):
