@@ -23,6 +23,9 @@ NAVTARA_DATA = {
     "મૈત્રી તારા": ["મૂળ", "અશ્વિની", "મઘા"],
     "અતિ મૈત્રી તારા": ["પૂર્વાષાઢા", "ભરણી", "પૂર્વા ફાલ્ગુની"]
 }
+def format_dms(deg):
+    d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
+    return f"{d}°{m}'{s}\""
 
 def create_calendar_event(summary, description):
     print(f"DEBUG: '{summary}' માટે કેલેન્ડર ઇવેન્ટ બનાવવાનું શરૂ થયું છે...")
