@@ -38,7 +38,8 @@ def get_nakshatra(planet_id, target_time):
 
 def get_fine_times(planet_id, target_nak):
     search_hours = 360 if planet_id == 0 else 72
-    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    # ગણતરી માટે આજના દિવસની શરૂઆતનો સમય (IST)
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     
     for i in range(0, search_hours * 60, 60):
         t_check = start + timedelta(minutes=i)
@@ -58,14 +59,16 @@ def get_fine_times(planet_id, target_nak):
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
-    current_hour_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d_%H')
+    # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
+    current_date_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                alert_id = f"{p_name}_{fut_n}_{current_hour_id}"
+                # યુનિક આઈડીમાં તારીખનો ઉપયોગ
+                alert_id = f"{p_name}_{fut_n}_{current_date_id}"
                 if is_alert_sent(alert_id): continue
                 
                 entry, exit_t = get_fine_times(p_id, fut_n)

@@ -38,7 +38,6 @@ def format_dms(deg):
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    # ગણતરી માટે UTC સમયનો ઉપયોગ
     jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0)
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
@@ -53,7 +52,8 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nak_name
 
 def get_transition_details(p_id, target_nak):
-    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    # આજના દિવસની શરૂઆત (00:00 IST) થી ગણતરી
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     for i in range(0, 48 * 60, 15):
         t = start + timedelta(minutes=i)
         r_name, r_deg, n_name = get_astro_position(p_id, t)
@@ -76,7 +76,9 @@ def run_tracker():
         
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         if entry_t and entry_t > now and entry_t < (now + timedelta(hours=24)):
-            alert_id = f"{target_nak}_{name}_{entry_t.strftime('%Y%m%d_%H')}"
+            # તારીખ આધારિત Unique ID
+            current_date_id = now.strftime('%Y%m%d')
+            alert_id = f"{target_nak}_{name}_{current_date_id}"
             
             already_sent = False
             if os.path.exists(HISTORY_FILE):

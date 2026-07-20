@@ -17,7 +17,7 @@ LAT, LON = 22.2735, 70.7513
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "ઉત્તરાફાલ્ગુની", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
-    {"nakshatra": "ઉત્તરાષાઢા", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "अગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
+    {"nakshatra": "ઉત્તરાષાઢા", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "રોહિણી", "pada": 1, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
     {"nakshatra": "હસ્ત", "pada": 2, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
     {"nakshatra": "શ્રવણ", "pada": 2, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
@@ -59,19 +59,17 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nakshatras[nak_idx % 27], data % 13.333333333333334, pada
 
 def get_fine_transition(p_id, target_entry):
-    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-    # 1 કલાકના ગાળે શોધો
+    # ગણતરી માટે આજના દિવસની શરૂઆત
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     for i in range(0, 24 * 60, 60):
         t_check = start + timedelta(minutes=i)
         _, _, n, _, p = get_astro_position(p_id, t_check)
         if n == target_entry["nakshatra"] and p == target_entry["pada"]:
-            # પ્રવેશ મળી ગયો, હવે 1-મિનિટની ચોકસાઈથી પાછળનું સ્ટેપ શોધો
             for j in range(max(0, i-60), i):
                 t_fine = start + timedelta(minutes=j)
                 _, _, n_f, _, p_f = get_astro_position(p_id, t_fine)
                 if n_f == target_entry["nakshatra"] and p_f == target_entry["pada"]:
                     entry_t = t_fine + timedelta(hours=5, minutes=30)
-                    # હવે નિર્ગમન શોધો
                     for k in range(j, j + 48 * 60):
                         t_exit = start + timedelta(minutes=k)
                         _, _, n_e, _, p_e = get_astro_position(p_id, t_exit)
@@ -97,6 +95,9 @@ def create_calendar_event(summary, description):
     except Exception as e: print(f"Calendar Error: {e}")
 
 def run_tracker():
+    # તારીખ આધારિત Unique ID બનાવવા માટે
+    current_date_id = datetime.now(timezone.utc).strftime('%Y%m%d')
+    
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
@@ -105,13 +106,15 @@ def run_tracker():
         for entry in PUSHKAR_DATA:
             entry_time, exit_time = get_fine_transition(p_id, entry)
             if entry_time and exit_time:
-                alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{entry_time.strftime('%Y%m%d_%H')}"
+                # Alert ID માંથી _%H કાઢી નાખ્યું
+                alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{current_date_id}"
                 if not is_alert_sent(alert_id):
                     msg = (f"એડવાન્સ એલર્ટ: {name}\nહાલ {c_rasi} રાશિમાં {format_dms(c_rd)} પર {c_nak} નક્ષત્રમાં {format_dms(c_nd)} પર છે.\n"
                            f"જે આગામી {entry_time.strftime('%H:%M, %d %b')} ના રોજ પુષ્કર નાવંશ {entry['nakshatra']} નક્ષત્રના {entry['pada']} પદમાં પ્રવેશ કરશે.\n"
                            f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
                            f"આ પદની નાવંશ રાશિ {entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {entry['mul_tatva']} છે.\n"
                            f"નાવંશ તત્વ {entry['nav_tatva']} છે અને પ્રધાન તત્વ {entry['pradhan']} છે.")
+                    
                     print(msg)
                     msg_encoded = urllib.parse.quote(msg)
                     requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")

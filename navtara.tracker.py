@@ -3,10 +3,15 @@ import swisseph as swe
 import requests
 import os
 import urllib.parse
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 
 # --- કોન્ફિગરેશન ---
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
+SERVICE_ACCOUNT_FILE = 'credentials.json'
+CALENDAR_ID = '12356pradip@gmail.com'
+SCOPES = ['https://www.googleapis.com/auth/calendar']
 LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "alert_history.txt"
 
@@ -18,6 +23,24 @@ NAVTARA_DATA = {
     "મૈત્રી તારા": ["મૂળ", "અશ્વિની", "મઘા"],
     "અતિ મૈત્રી તારા": ["પૂર્વાષાઢા", "ભરણી", "પૂર્વા ફાલ્ગુની"]
 }
+
+def create_calendar_event(summary, description):
+    try:
+        if not os.path.exists(SERVICE_ACCOUNT_FILE): return False
+        creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
+        service = build('calendar', 'v3', credentials=creds)
+        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+        event = {
+            'summary': summary,
+            'description': description,
+            'start': {'dateTime': now.isoformat()},
+            'end': {'dateTime': (now + timedelta(hours=1)).isoformat()},
+        }
+        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        return True
+    except Exception as e:
+        print(f"❌ કેલેન્ડર એરર: {e}")
+        return False
 
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): return False
@@ -38,7 +61,8 @@ def get_nakshatra(planet_id, target_time):
 
 def get_fine_times(planet_id, target_nak):
     search_hours = 360 if planet_id == 0 else 72
-    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    # ગણતરી માટે આજના દિવસની શરૂઆતનો સમય (IST)
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     
     for i in range(0, search_hours * 60, 60):
         t_check = start + timedelta(minutes=i)
@@ -58,14 +82,16 @@ def get_fine_times(planet_id, target_nak):
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
-    current_hour_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d_%H')
+    # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
+    current_date_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                alert_id = f"{p_name}_{fut_n}_{current_hour_id}"
+                # યુનિક આઈડીમાં તારીખનો ઉપયોગ
+                alert_id = f"{p_name}_{fut_n}_{current_date_id}"
                 if is_alert_sent(alert_id): continue
                 
                 entry, exit_t = get_fine_times(p_id, fut_n)
@@ -76,6 +102,7 @@ def run_tracker():
                 
                 url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
                 requests.get(url)
+                create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
                 print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
                 break
