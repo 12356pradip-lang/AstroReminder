@@ -96,6 +96,7 @@ def get_fine_times(planet_id, target_nak):
     return "N/A", "N/A"
 
 def run_tracker():
+    print("DEBUG: Tracker રન થઈ રહ્યો છે...") # આ લાઈન ઉમેરો
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
     # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
