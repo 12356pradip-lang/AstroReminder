@@ -1,5 +1,5 @@
 import swisseph as swe
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 import requests
 from googleapiclient.discovery import build
@@ -19,12 +19,12 @@ def create_calendar_event(summary, description):
         if not os.path.exists(SERVICE_ACCOUNT_FILE): return False
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
-        now = datetime.now()
+        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         event = {
             'summary': summary,
             'description': description,
-            'start': {'dateTime': now.isoformat() + 'Z'},
-            'end': {'dateTime': (now + timedelta(hours=1)).isoformat() + 'Z'},
+            'start': {'dateTime': now.isoformat()},
+            'end': {'dateTime': (now + timedelta(hours=1)).isoformat()},
         }
         service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
         return True
@@ -38,7 +38,7 @@ def format_dms(deg):
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    # અહીં પણ local time મુજબ ગણતરી થાય છે
+    # ગણતરી માટે UTC સમયનો ઉપયોગ
     jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0)
     swe.set_topo(LON, LAT, 0)
     data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
@@ -53,7 +53,7 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nak_name
 
 def get_transition_details(p_id, target_nak):
-    start = datetime.now()
+    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     for i in range(0, 48 * 60, 15):
         t = start + timedelta(minutes=i)
         r_name, r_deg, n_name = get_astro_position(p_id, t)
@@ -74,7 +74,7 @@ def run_tracker():
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         entry_t, exit_t, rasi, deg = get_transition_details(p_id, target_nak)
         
-        now = datetime.now()
+        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         if entry_t and entry_t > now and entry_t < (now + timedelta(hours=24)):
             alert_id = f"{target_nak}_{name}_{entry_t.strftime('%Y%m%d_%H')}"
             

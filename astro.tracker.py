@@ -2,7 +2,7 @@ import swisseph as swe
 import requests
 import os
 import urllib.parse
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
@@ -17,7 +17,7 @@ LAT, LON = 22.2735, 70.7513
 PUSHKAR_DATA = [
     {"nakshatra": "કૃતિકા", "pada": 3, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "ઉત્તરાફાલ્ગુની", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
-    {"nakshatra": "ઉત્તરાષાઢા", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "અગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
+    {"nakshatra": "ઉત્તરાષાઢા", "pada": 4, "navansh_rashi": "મીન", "mul_tatva": "अગ્નિ", "nav_tatva": "જળ", "pradhan": "જળ"},
     {"nakshatra": "રોહિણી", "pada": 1, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
     {"nakshatra": "હસ્ત", "pada": 2, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
     {"nakshatra": "શ્રવણ", "pada": 2, "navansh_rashi": "વૃષભ", "mul_tatva": "પૃથ્વી", "nav_tatva": "પૃથ્વી", "pradhan": "પૃથ્વી"},
@@ -59,7 +59,7 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nakshatras[nak_idx % 27], data % 13.333333333333334, pada
 
 def get_fine_transition(p_id, target_entry):
-    start = datetime.utcnow()
+    start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     # 1 કલાકના ગાળે શોધો
     for i in range(0, 24 * 60, 60):
         t_check = start + timedelta(minutes=i)
@@ -91,14 +91,15 @@ def create_calendar_event(summary, description):
     try:
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=['https://www.googleapis.com/auth/calendar'])
         service = build('calendar', 'v3', credentials=creds)
-        event = {'summary': summary, 'description': description, 'start': {'dateTime': datetime.utcnow().isoformat() + 'Z'}, 'end': {'dateTime': (datetime.utcnow() + timedelta(hours=1)).isoformat() + 'Z'}}
+        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+        event = {'summary': summary, 'description': description, 'start': {'dateTime': now.isoformat()}, 'end': {'dateTime': (now + timedelta(hours=1)).isoformat()}}
         service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
     except Exception as e: print(f"Calendar Error: {e}")
 
 def run_tracker():
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         c_rasi, c_rd, c_nak, c_nd, c_pada = get_astro_position(p_id, now)
         
         for entry in PUSHKAR_DATA:
