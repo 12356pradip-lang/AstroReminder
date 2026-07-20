@@ -52,26 +52,31 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nak_name
 
 def get_fine_times(planet_id, target_nak):
-    # 1 મિનિટની ચોકસાઈ માટેનું સચોટ ફંક્શન
     search_hours = 360 if planet_id == 0 else 72
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     
-    # એન્ટ્રી પોઈન્ટ શોધવા માટે 1 મિનિટનો લૂપ
     entry = None
+    entry_data = None # એન્ટ્રી વખતે રાશિ અને ડિગ્રી સાચવવા માટે
+    
+    # 1 મિનિટનો લૂપ
     for i in range(0, search_hours * 60):
         t_check = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t_check) == target_nak:
+        # get_nakshatra ને બદલે get_astro_position વાપરો
+        rasi, deg, nak = get_astro_position(planet_id, t_check)
+        if nak == target_nak:
             entry = t_check
+            entry_data = (rasi, deg) # અહીં ડેટા સાચવો
             break
             
     if entry:
-        # નિર્ગમન શોધવા માટે 1 મિનિટનો લૂપ
         for k in range(1, 72 * 60):
             t_exit = entry + timedelta(minutes=k)
-            if get_nakshatra(planet_id, t_exit) != target_nak:
-                return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+            rasi_e, deg_e, nak_e = get_astro_position(planet_id, t_exit)
+            if nak_e != target_nak:
+                # entry_data માંથી રાશિ અને ડિગ્રી રિટર્ન કરો
+                return entry, t_exit, entry_data[0], entry_data[1]
                 
-    return "N/A", "N/A"
+    return None, None, None, None
 
 def run_tracker():
     target_nak = ["આશ્લેષા", "મઘા", "જ્યેષ્ઠા", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
