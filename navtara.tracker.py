@@ -37,11 +37,9 @@ def get_nakshatra(planet_id, target_time):
     return nakshatras[nak_idx % 27]
 
 def get_fine_times(planet_id, target_nak):
-    # સૂર્ય માટે 15 દિવસ (360 કલાક), ચંદ્ર માટે 3 દિવસ (72 કલાક)
     search_hours = 360 if planet_id == 0 else 72
     start = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    # પ્રવેશ માટે શોધો
     for i in range(0, search_hours * 60, 60):
         t_check = start + timedelta(minutes=i)
         if get_nakshatra(planet_id, t_check) == target_nak:
@@ -49,12 +47,13 @@ def get_fine_times(planet_id, target_nak):
                 t_fine = start + timedelta(minutes=j)
                 if get_nakshatra(planet_id, t_fine) == target_nak:
                     entry = t_fine
-                    # નિર્ગમન શોધવા માટે સમાન ગાળો
+                    # નિર્ગમન શોધવા માટે લૂપ
                     for k in range(j, j + search_hours * 60):
                         t_exit = start + timedelta(minutes=k)
                         if get_nakshatra(planet_id, t_exit) != target_nak:
                             return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
-            break
+    
+    # આ return લૂપની બિલકુલ બહાર હોવું જોઈએ, જે ફંક્શનને "N/A" આપવા માટે કહેશે
     return "N/A", "N/A"
 
 def run_tracker():
