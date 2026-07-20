@@ -28,39 +28,53 @@ def format_dms(deg):
     d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
 
+def get_current_data(planet_id):
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    jd = swe.julday(now.year, now.month, now.day, now.hour + (now.minute / 60.0) + (now.second / 3600.0) + 5.5)
+    swe.set_topo(LON, LAT, 0)
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
+    
+    rasi_idx = int(data // 30)
+    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
+    nak_idx = int(data // 13.333333333333334)
+    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+    
+    return rashis[rasi_idx], nakshatras[nak_idx % 27], data % 13.333333333333334
+
+def get_nakshatra(planet_id, target_time):
+    swe.set_sid_mode(swe.SIDM_LAHIRI)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + (target_time.minute / 60.0) + 5.5)
+    swe.set_topo(LON, LAT, 0)
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
+    nak_idx = int(data // 13.333333333333334)
+    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+    return nakshatras[nak_idx % 27]
+
+def get_fine_times(planet_id, target_nak):
+    search_hours = 360 if planet_id == 0 else 72
+    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
+    for i in range(0, search_hours * 60, 60):
+        t_check = start + timedelta(minutes=i)
+        if get_nakshatra(planet_id, t_check) == target_nak:
+            for j in range(max(0, i-60), i + 120):
+                t_fine = start + timedelta(minutes=j)
+                if get_nakshatra(planet_id, t_fine) == target_nak:
+                    entry = t_fine
+                    for k in range(j, j + search_hours * 60):
+                        t_exit = start + timedelta(minutes=k)
+                        if get_nakshatra(planet_id, t_exit) != target_nak:
+                            return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+    return "N/A", "N/A"
+
 def create_calendar_event(summary, description):
-    print(f"DEBUG: '{summary}' માટે કેલેન્ડર ઇવેન્ટ બનાવવાનું શરૂ થયું છે...")
-    
-    # જો ફાઈલ ન મળે તો પ્રોગ્રામ બંધ ન કરો, ફક્ત એરર પ્રિન્ટ કરો જેથી ખબર પડે
-    if not os.path.exists(SERVICE_ACCOUNT_FILE):
-        print(f"❌ ERROR: '{SERVICE_ACCOUNT_FILE}' ફાઈલ મળી નથી.")
-        return False
-    
     try:
-        # ક્રેડેન્શિયલ લોડિંગ
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
-        
-        # સમયની ગણતરી
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-        event = {
-            'summary': summary,
-            'description': description,
-            'start': {'dateTime': now.isoformat()},
-            'end': {'dateTime': (now + timedelta(hours=1)).isoformat()},
-        }
-        
-        # API કોલ
-        print("DEBUG: API રિક્વેસ્ટ મોકલી રહ્યા છીએ...")
-        result = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
-        
-        print(f"✅ સફળ: કેલેન્ડર ઇવેન્ટ બની ગઈ! ID: {result.get('id')}")
-        return True
-        
-    except Exception as e:
-        # આ લાઇન સૌથી મહત્વની છે, તે એરરનું કારણ બતાવશે
-        print(f"❌ કેલેન્ડર એરરની વિગત: {str(e)}")
-        return False
+        event = {'summary': summary, 'description': description, 'start': {'dateTime': now.isoformat()}, 'end': {'dateTime': (now + timedelta(hours=1)).isoformat()}}
+        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+    except Exception as e: print(f"❌ કેલેન્ડર એરર: {e}")
 
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): return False
@@ -69,54 +83,27 @@ def is_alert_sent(alert_id):
 def mark_alert_sent(alert_id):
     with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
-def get_nakshatra(planet_id, target_time):
-    swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(target_time.year, target_time.month, target_time.day, 
-                    target_time.hour + (target_time.minute / 60.0) + (target_time.second / 3600.0) + 5.5)
-    swe.set_topo(LON, LAT, 0)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
-    nak_idx = int(data // 13.333333333333334)
-    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    return nakshatras[nak_idx % 27]
-
-def get_fine_times(planet_id, target_nak):
-    search_hours = 360 if planet_id == 0 else 72
-    # ગણતરી માટે આજના દિવસની શરૂઆતનો સમય (IST)
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
-    
-    for i in range(0, search_hours * 60, 60):
-        t_check = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t_check) == target_nak:
-            for j in range(max(0, i-60), i + 120):
-                t_fine = start + timedelta(minutes=j)
-                if get_nakshatra(planet_id, t_fine) == target_nak:
-                    entry = t_fine
-                    # નિર્ગમન શોધવા માટે લૂપ
-                    for k in range(j, j + search_hours * 60):
-                        t_exit = start + timedelta(minutes=k)
-                        if get_nakshatra(planet_id, t_exit) != target_nak:
-                            return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
-    
-    return "N/A", "N/A"
-
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
-    # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
     current_date_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
+        curr_rashi, curr_nak, curr_deg = get_current_data(p_id)
 
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                # યુનિક આઈડીમાં તારીખનો ઉપયોગ
                 alert_id = f"{p_name}_{fut_n}_{current_date_id}"
                 if is_alert_sent(alert_id): continue
                 
                 entry, exit_t = get_fine_times(p_id, fut_n)
+                
+                # નવું ફોર્મેટ કરેલું આઉટપુટ
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
-                       f"નક્ષત્ર: {fut_n}\n"
+                       f"---------------------------\n"
+                       f"વર્તમાન સ્થિતિ: {curr_rashi}, {curr_nak} ({format_dms(curr_deg)})\n"
+                       f"ભવિષ્યનું નક્ષત્ર: {fut_n}\n"
                        f"પ્રવેશ: {entry}\n"
                        f"નિર્ગમન: {exit_t}")
                 
@@ -124,7 +111,7 @@ def run_tracker():
                 requests.get(url)
                 create_calendar_event(f"નવતારા: {tara}", msg)
                 mark_alert_sent(alert_id)
-                print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
+                print(f"✅ એલર્ટ મોકલાયું:\n{msg}")
                 break
 
 if __name__ == "__main__":
