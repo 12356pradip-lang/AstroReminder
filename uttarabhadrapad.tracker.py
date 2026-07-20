@@ -74,7 +74,7 @@ def get_fine_times(planet_id, target_nak):
     return "N/A", "N/A"
 
 def run_tracker():
-    target_nak = "ઉત્તરા ભાદ્રપદ"
+    target_nak = ["આશ્લેષા", "મઘા", "જ્યેષ્ઠા", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         entry_t, exit_t, rasi, deg = get_transition_details(p_id, target_nak)
