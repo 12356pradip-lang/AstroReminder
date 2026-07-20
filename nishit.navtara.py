@@ -41,23 +41,25 @@ def get_nakshatra(planet_id, target_time):
     return nakshatras[nak_idx % 27]
 
 def get_fine_times(planet_id, target_nak):
+    # સચોટતા માટે 1 મિનિટના અંતરે શોધવું (આ સૌથી બેસ્ટ રીત છે)
     search_hours = 360 if planet_id == 0 else 72
-    # ગણતરી માટે આજના દિવસની શરૂઆતનો સમય (IST)
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
     
-    for i in range(0, search_hours * 60, 60):
+    # 1 મિનિટના ગેપથી સચોટ એન્ટ્રી શોધવી
+    entry = None
+    for i in range(0, search_hours * 60):
         t_check = start + timedelta(minutes=i)
         if get_nakshatra(planet_id, t_check) == target_nak:
-            for j in range(max(0, i-60), i + 120):
-                t_fine = start + timedelta(minutes=j)
-                if get_nakshatra(planet_id, t_fine) == target_nak:
-                    entry = t_fine
-                    # નિર્ગમન શોધવા માટે લૂપ
-                    for k in range(j, j + search_hours * 60):
-                        t_exit = start + timedelta(minutes=k)
-                        if get_nakshatra(planet_id, t_exit) != target_nak:
-                            return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
-    
+            entry = t_check
+            break
+            
+    if entry:
+        # એન્ટ્રી મળી ગયા પછી, નિર્ગમન શોધવા માટે 1 મિનિટના ગેપથી આગળ વધવું
+        for k in range(1, 72 * 60): # 72 કલાક સુધી ચેક કરવું
+            t_exit = entry + timedelta(minutes=k)
+            if get_nakshatra(planet_id, t_exit) != target_nak:
+                return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                
     return "N/A", "N/A"
 
 def run_tracker():

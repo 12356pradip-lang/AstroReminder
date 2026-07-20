@@ -51,22 +51,27 @@ def get_astro_position(planet_id, target_time):
     
     return rasi_name, data % 30, nak_name
 
-def get_transition_details(p_id, target_nak):
-    # આજના દિવસની શરૂઆત (00:00 IST) થી ગણતરી
+def get_fine_times(planet_id, target_nak):
+    # 1 મિનિટની ચોકસાઈ માટેનું સચોટ ફંક્શન
+    search_hours = 360 if planet_id == 0 else 72
     start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
-    for i in range(0, 48 * 60, 15):
-        t = start + timedelta(minutes=i)
-        r_name, r_deg, n_name = get_astro_position(p_id, t)
-        if n_name == target_nak:
-            entry_time = t
-            for j in range(i, 48 * 60, 15):
-                t_exit = start + timedelta(minutes=j)
-                _, _, n_exit = get_astro_position(p_id, t_exit)
-                if n_exit != target_nak:
-                    exit_time = t_exit
-                    return entry_time, exit_time, r_name, r_deg
+    
+    # એન્ટ્રી પોઈન્ટ શોધવા માટે 1 મિનિટનો લૂપ
+    entry = None
+    for i in range(0, search_hours * 60):
+        t_check = start + timedelta(minutes=i)
+        if get_nakshatra(planet_id, t_check) == target_nak:
+            entry = t_check
             break
-    return None, None, None, None
+            
+    if entry:
+        # નિર્ગમન શોધવા માટે 1 મિનિટનો લૂપ
+        for k in range(1, 72 * 60):
+            t_exit = entry + timedelta(minutes=k)
+            if get_nakshatra(planet_id, t_exit) != target_nak:
+                return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                
+    return "N/A", "N/A"
 
 def run_tracker():
     target_nak = "ઉત્તરા ભાદ્રપદ"
