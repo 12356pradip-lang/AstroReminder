@@ -19,6 +19,10 @@ NAVTARA_DATA = {
     "પરમ મિત્ર તારા": ["પુષ્ય", "અનુરાધા", "ઉત્તરા ભાદ્રપદા"],
 }
 
+def format_dms(deg):
+    d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
+    return f"{d}°{m}'{s}\""
+    
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): return False
     with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
