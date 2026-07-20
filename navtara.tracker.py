@@ -25,10 +25,19 @@ NAVTARA_DATA = {
 }
 
 def create_calendar_event(summary, description):
+    print(f"DEBUG: '{summary}' માટે કેલેન્ડર ઇવેન્ટ બનાવવાનું શરૂ થયું છે...")
+    
+    # જો ફાઈલ ન મળે તો પ્રોગ્રામ બંધ ન કરો, ફક્ત એરર પ્રિન્ટ કરો જેથી ખબર પડે
+    if not os.path.exists(SERVICE_ACCOUNT_FILE):
+        print(f"❌ ERROR: '{SERVICE_ACCOUNT_FILE}' ફાઈલ મળી નથી.")
+        return False
+    
     try:
-        if not os.path.exists(SERVICE_ACCOUNT_FILE): return False
+        # ક્રેડેન્શિયલ લોડિંગ
         creds = service_account.Credentials.from_service_account_file(SERVICE_ACCOUNT_FILE, scopes=SCOPES)
         service = build('calendar', 'v3', credentials=creds)
+        
+        # સમયની ગણતરી
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
         event = {
             'summary': summary,
@@ -36,10 +45,17 @@ def create_calendar_event(summary, description):
             'start': {'dateTime': now.isoformat()},
             'end': {'dateTime': (now + timedelta(hours=1)).isoformat()},
         }
-        service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        
+        # API કોલ
+        print("DEBUG: API રિક્વેસ્ટ મોકલી રહ્યા છીએ...")
+        result = service.events().insert(calendarId=CALENDAR_ID, body=event).execute()
+        
+        print(f"✅ સફળ: કેલેન્ડર ઇવેન્ટ બની ગઈ! ID: {result.get('id')}")
         return True
+        
     except Exception as e:
-        print(f"❌ કેલેન્ડર એરર: {e}")
+        # આ લાઇન સૌથી મહત્વની છે, તે એરરનું કારણ બતાવશે
+        print(f"❌ કેલેન્ડર એરરની વિગત: {str(e)}")
         return False
 
 def is_alert_sent(alert_id):
