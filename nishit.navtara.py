@@ -11,12 +11,12 @@ LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "nishit_history.txt"
 
 NAVTARA_DATA = {
-    "જન્મ તારા": ["આશ્લેષા", "જ્યેષ્ઠા", "રેવતી"],
-    "સંપત તારા": ["અશ્વિની", "મઘા", "મૂલા"],
-    "ક્ષેમ તારા": ["કૃતિકા", "ઉત્તરા ફાલ્ગુની", "ઉત્તરાષાઢા"],
-    "સાધક તારા": ["મૃગશીર્ષ", "ચિત્રા", "ધનિષ્ટા"],
-    "મિત્ર તારા": ["પુનર્વસુ", "વિશાખા", "પૂર્વા ભાદ્રપદા"],
-    "પરમ મિત્ર તારા": ["પુષ્ય", "અનુરાધા", "ઉત્તરા ભાદ્રપદા"],
+    "જન્મ તારા": ["જ્યેષ્ઠા", "આશ્લેષા", "રેવતી"],
+    "સંપત તારા": ["મઘા", "અશ્વિની", "મૂલા"],
+    "ક્ષેમ તારા": ["ઉત્તરા ફાલ્ગુની", "કૃતિકા", "ઉત્તરાષાઢા"],
+    "સાધક તારા": ["ચિત્રા", "મૃગશીર્ષ", "ધનિષ્ટા"],
+    "મિત્ર તારા": ["વિશાખા", "પુનર્વસુ", "પૂર્વા ભાદ્રપદા"],
+    "પરમ મિત્ર તારા": ["અનુરાધા", "પુષ્ય", "ઉત્તરા ભાદ્રપદા"],
 }
 
 def format_dms(deg):
@@ -41,40 +41,61 @@ def get_nakshatra(planet_id, target_time):
     return nakshatras[nak_idx % 27]
 
 def get_fine_times(planet_id, target_nak):
-    # સચોટતા માટે 1 મિનિટના અંતરે શોધવું (આ સૌથી બેસ્ટ રીત છે)
-    search_hours = 360 if planet_id == 0 else 72
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
+    now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    # 1 મિનિટના ગેપથી સચોટ એન્ટ્રી શોધવી
-    entry = None
-    for i in range(0, search_hours * 60):
-        t_check = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t_check) == target_nak:
-            entry = t_check
-            break
-            
-    if entry:
-        # એન્ટ્રી મળી ગયા પછી, નિર્ગમન શોધવા માટે 1 મિનિટના ગેપથી આગળ વધવું
-        for k in range(1, 72 * 60): # 72 કલાક સુધી ચેક કરવું
-            t_exit = entry + timedelta(minutes=k)
+    if planet_id == 0:  # સૂર્ય માટે (લાંબો સમય નક્ષત્રમાં રહે છે)
+        start_search = now - timedelta(days=15)
+        entry = None
+        for i in range(0, 15 * 24 + 48, 1):
+            t_check = start_search + timedelta(hours=i)
+            if get_nakshatra(planet_id, t_check) == target_nak:
+                entry = t_check
+                break
+        
+        if not entry:
+            entry = now
+
+        t_exit = entry + timedelta(days=1)
+        for _ in range(30 * 24):
             if get_nakshatra(planet_id, t_exit) != target_nak:
-                return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                break
+            t_exit += timedelta(hours=1)
+        return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+
+    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - મિનિટ-વાઈઝ પરફેક્ટ સ્કેન)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        entry = None
+        for i in range(0, 72 * 60):  
+            t_check = start + timedelta(minutes=i)
+            if get_nakshatra(planet_id, t_check) == target_nak:
+                entry = t_check
+                break
                 
-    return "N/A", "N/A"
+        if entry:
+            for k in range(1, 72 * 60):
+                t_exit = entry + timedelta(minutes=k)
+                if get_nakshatra(planet_id, t_exit) != target_nak:
+                    return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                    
+        return "N/A", "N/A"
 
 def run_tracker():
     planets = {0: "સૂર્ય", 1: "ચંદ્ર"}
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
-    # ડુપ્લીકેશન રોકવા માટે કલાકને બદલે માત્ર તારીખનો ઉપયોગ
-    current_date_id = (datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)).strftime('%Y%m%d')
 
     for p_id, p_name in planets.items():
         fut_n = get_nakshatra(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                # યુનિક આઈડીમાં તારીખનો ઉપયોગ
-                alert_id = f"{p_name}_{fut_n}_{current_date_id}"
+                # સૂર્ય માટે નિર્ગમન તારીખ સુધી એલર્ટ લોક રાખવું જેથી રિપીટ ન થાય, ચંદ્ર માટે એન્ટ્રી ટાઇમ બેઝ્ડ આઈડી
+                if p_id == 0:
+                    _, exit_str = get_fine_times(p_id, fut_n)
+                    alert_id = f"{p_name}_{fut_n}_{exit_str}"
+                else:
+                    entry_str, _ = get_fine_times(p_id, fut_n)
+                    alert_id = f"{p_name}_{fut_n}_{entry_str}"
+
                 if is_alert_sent(alert_id): continue
                 
                 entry, exit_t = get_fine_times(p_id, fut_n)
