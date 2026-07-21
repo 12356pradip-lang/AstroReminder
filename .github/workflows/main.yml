@@ -31,7 +31,8 @@ jobs:
           python navtara.tracker.py
           python nishit.navtara.py
           python uttarabhadrapad.tracker.py
-
+          python tithi.tracker.py
+          
       - name: Commit updated history
         run: |
           git config --global user.name 'GitHub Actions'
