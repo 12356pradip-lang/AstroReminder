@@ -47,9 +47,9 @@ def format_dms(deg):
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + 5.5)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + target_time.second/3600.0 + 5.5)
     swe.set_topo(LON, LAT, 0)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
     if planet_id == 1: data = (data - 2.9) % 360
     rasi_idx = int(data // 30)
     rasi_name = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"][rasi_idx]
@@ -59,38 +59,47 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nakshatras[nak_idx % 27], data % 13.333333333333334, pada
 
 def get_fine_transition(p_id, target_entry):
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
+    now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    for i in range(0, 24 * 60): 
-        t_check = start + timedelta(minutes=i)
+    if p_id == 0:  # સૂર્ય માટે (લાંબો સમય નક્ષત્ર-પદમાં રહે છે)
+        start_search = now - timedelta(days=15)
+        entry_t = None
+        for i in range(0, 15 * 24 + 48, 1):
+            t_check = start_search + timedelta(hours=i)
+            rasi, deg, n, _, p = get_astro_position(p_id, t_check)
+            if n == target_entry["nakshatra"] and p == target_entry["pada"]:
+                entry_t = t_check
+                break
         
-        # બધી જ વેલ્યુઝ 'data' માં લઈ લો
-        data = get_astro_position(p_id, t_check)
-        
-        # હવે ડેટામાંથી આપણને જોઈએ છે તે રીતે અસાઇન કરો
-        # ધારી લઈએ કે: [રાશિ, ડિગ્રી, નક્ષત્ર] આ ક્રમમાં છે
-        rasi = data[0]
-        deg = data[1]
-        n = data[2]
-        
-        p = int(deg / 3.3333333333333335) + 1
-        
-        if n == target_entry["nakshatra"] and p == target_entry["pada"]:
-            entry_t = t_check
-            
-            for j in range(i + 1, 24 * 60):
-                t_exit = start + timedelta(minutes=j)
-                # એક્ઝિટ માટે પણ આ જ રીતે
-                data_e = get_astro_position(p_id, t_exit)
-                n_e = data_e[2]
-                d_e = data_e[1]
-                p_e = int(d_e / 3.3333333333333335) + 1
+        if not entry_t:
+            return None, None
+
+        t_exit = entry_t + timedelta(days=1)
+        for _ in range(30 * 24):
+            rasi_e, deg_e, n_e, _, p_e = get_astro_position(p_id, t_exit)
+            if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
+                break
+            t_exit += timedelta(hours=1)
+        return entry_t, t_exit
+
+    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - મિનિટ-વાઈઝ પરફેક્ટ સ્કેન)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        entry_t = None
+        for i in range(0, 72 * 60):  
+            t_check = start + timedelta(minutes=i)
+            rasi, deg, n, _, p = get_astro_position(p_id, t_check)
+            if n == target_entry["nakshatra"] and p == target_entry["pada"]:
+                entry_t = t_check
+                break
                 
+        if entry_t:
+            for k in range(1, 72 * 60):
+                t_exit = entry_t + timedelta(minutes=k)
+                rasi_e, deg_e, n_e, _, p_e = get_astro_position(p_id, t_exit)
                 if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
                     return entry_t, t_exit
-            break
-            
-    return None, None
+                    
+        return None, None
 
 def is_alert_sent(alert_id):
     if not os.path.exists(HISTORY_FILE): return False
@@ -109,9 +118,6 @@ def create_calendar_event(summary, description):
     except Exception as e: print(f"Calendar Error: {e}")
 
 def run_tracker():
-    # તારીખ આધારિત Unique ID બનાવવા માટે
-    current_date_id = datetime.now(timezone.utc).strftime('%Y%m%d')
-    
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
@@ -120,21 +126,27 @@ def run_tracker():
         for entry in PUSHKAR_DATA:
             entry_time, exit_time = get_fine_transition(p_id, entry)
             if entry_time and exit_time:
-                # Alert ID માંથી _%H કાઢી નાખ્યું
-                alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{current_date_id}"
+                # સૂર્ય માટે નિર્ગમન સમય આધારિત ID, ચંદ્ર માટે પ્રવેશ સમય આધારિત ID
+                if p_id == 0:
+                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{exit_time.strftime('%Y%m%d_%H%M')}"
+                else:
+                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{entry_time.strftime('%Y%m%d_%H%M')}"
+
                 if not is_alert_sent(alert_id):
-                    msg = (f"એડવાન્સ એલર્ટ: {name}\nહાલ {c_rasi} રાશિમાં {format_dms(c_rd)} પર {c_nak} નક્ષત્રમાં {format_dms(c_nd)} પર છે.\n"
-                           f"જે આગામી {entry_time.strftime('%H:%M, %d %b')} ના રોજ પુષ્કર નાવંશ {entry['nakshatra']} નક્ષત્રના {entry['pada']} પદમાં પ્રવેશ કરશે.\n"
-                           f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
-                           f"આ પદની નાવંશ રાશિ {entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {entry['mul_tatva']} છે.\n"
-                           f"નાવંશ તત્વ {entry['nav_tatva']} છે અને પ્રધાન તત્વ {entry['pradhan']} છે.")
-                    
-                    print(msg)
-                    msg_encoded = urllib.parse.quote(msg)
-                    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
-                    create_calendar_event(f"પુષ્કર: {name}", msg)
-                    mark_alert_sent(alert_id)
-                    break
+                    # આગામી ૨૪ કલાકમાં પ્રવેશ થતો હોય તો જ એલર્ટ મોકલવું (મૂળ શરત મુજબ)
+                    if entry_time > now and entry_time < (now + timedelta(hours=24)):
+                        msg = (f"એડવાન્સ એલર્ટ: {name}\nહાલ {c_rasi} રાશિમાં {format_dms(c_rd)} પર {c_nak} નક્ષત્રમાં {format_dms(c_nd)} પર છે.\n"
+                               f"જે આગામી {entry_time.strftime('%H:%M, %d %b')} ના રોજ પુષ્કર નાવંશ {entry['nakshatra']} નક્ષત્રના {entry['pada']} પદમાં પ્રવેશ કરશે.\n"
+                               f"અને {exit_time.strftime('%H:%M, %d %b')} ના રોજ આ પદમાંથી નિર્ગમન કરશે.\n"
+                               f"આ પદની નાવંશ રાશિ {entry['navansh_rashi']} છે. મૂળ નક્ષત્ર તત્વ {entry['mul_tatva']} છે.\n"
+                               f"નાવંશ તત્વ {entry['nav_tatva']} છે અને પ્રધાન તત્વ {entry['pradhan']} છે.")
+                        
+                        print(msg)
+                        msg_encoded = urllib.parse.quote(msg)
+                        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
+                        create_calendar_event(f"પુષ્કર: {name}", msg)
+                        mark_alert_sent(alert_id)
+                        break
 
 if __name__ == "__main__":
     run_tracker()
