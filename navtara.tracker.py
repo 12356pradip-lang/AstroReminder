@@ -52,26 +52,46 @@ def get_nakshatra(planet_id, target_time):
     return nakshatras[nak_idx % 27]
 
 def get_fine_times(planet_id, target_nak):
-    # સચોટતા માટે 1 મિનિટના અંતરે શોધવું (આ સૌથી બેસ્ટ રીત છે)
-    search_hours = 360 if planet_id == 0 else 72
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
+    now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    # 1 મિનિટના ગેપથી સચોટ એન્ટ્રી શોધવી
-    entry = None
-    for i in range(0, search_hours * 60):
-        t_check = start + timedelta(minutes=i)
-        if get_nakshatra(planet_id, t_check) == target_nak:
-            entry = t_check
-            break
-            
-    if entry:
-        # એન્ટ્રી મળી ગયા પછી, નિર્ગમન શોધવા માટે 1 મિનિટના ગેપથી આગળ વધવું
-        for k in range(1, 72 * 60): # 72 કલાક સુધી ચેક કરવું
-            t_exit = entry + timedelta(minutes=k)
+    if planet_id == 0:  # સૂર્ય માટે (જે લાંબો સમય નક્ષત્રમાં રહે છે)
+        # ભૂતકાળમાં 15 દિવસ પાછળથી શરૂ કરીને એન્ટ્રી શોધો
+        start_search = now - timedelta(days=15)
+        entry = None
+        # 1 કલાકના સ્ટેપથી એન્ટ્રી શોધો (સૂર્ય માટે સ્પીડ સારી રહે)
+        for i in range(0, 15 * 24 + 48, 1):
+            t_check = start_search + timedelta(hours=i)
+            if get_nakshatra(planet_id, t_check) == target_nak:
+                entry = t_check
+                break
+        
+        if not entry:
+            entry = now
+
+        # એન્ટ્રી મળ્યા પછી નિર્ગમન (Exit) શોધવા આગળ વધવું
+        t_exit = entry + timedelta(days=1)
+        for _ in range(30 * 24):  # વધુમાં વધુ 30 દિવસ સુધી તપાસો
             if get_nakshatra(planet_id, t_exit) != target_nak:
-                return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                break
+            t_exit += timedelta(hours=1)
+        return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+
+    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - મિનિટ-વાઈઝ પરફેક્ટ સ્કેન)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        entry = None
+        for i in range(0, 72 * 60):  # 72 કલાક મિનિટવાળી લૂપ
+            t_check = start + timedelta(minutes=i)
+            if get_nakshatra(planet_id, t_check) == target_nak:
+                entry = t_check
+                break
                 
-    return "N/A", "N/A"
+        if entry:
+            for k in range(1, 72 * 60):
+                t_exit = entry + timedelta(minutes=k)
+                if get_nakshatra(planet_id, t_exit) != target_nak:
+                    return entry.strftime("%d %b %H:%M"), t_exit.strftime("%d %b %H:%M")
+                    
+        return "N/A", "N/A"
 
 def create_calendar_event(summary, description):
     try:
@@ -100,12 +120,19 @@ def run_tracker():
 
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
-                alert_id = f"{p_name}_{fut_n}_{current_date_id}"
+                # સૂર્ય માટે નિર્ગમન તારીખ સુધી એલર્ટ લોક રાખવું જેથી રિપીટ ન થાય, ચંદ્ર માટે ડેઈલી/એન્ટ્રી બેઝ્ડ આઈડી
+                if p_id == 0:
+                    _, exit_str = get_fine_times(p_id, fut_n)
+                    alert_id = f"{p_name}_{fut_n}_{exit_str}"
+                else:
+                    entry_str, _ = get_fine_times(p_id, fut_n)
+                    alert_id = f"{p_name}_{fut_n}_{entry_str}"
+
                 if is_alert_sent(alert_id): continue
                 
                 entry, exit_t = get_fine_times(p_id, fut_n)
                 
-                # નવું ફોર્મેટ કરેલું આઉટપુટ
+                # નવું ફોર્મેટ કરેલું આઉટપુટ (બિલકુલ મૂળ મુજબ જ)
                 msg = (f"🌟 {p_name} 12 કલાક એડવાન્સ એલર્ટ: {tara}\n"
                        f"---------------------------\n"
                        f"વર્તમાન સ્થિતિ: {curr_rashi}, {curr_nak} ({format_dms(curr_deg)})\n"
