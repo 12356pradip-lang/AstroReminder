@@ -38,9 +38,9 @@ def format_dms(deg):
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0)
+    jd = swe.julday(target_time.year, target_time.month, target_time.day, target_time.hour + target_time.minute/60.0 + target_time.second/3600.0 + 5.5)
     swe.set_topo(LON, LAT, 0)
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR)[0][0]
+    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH)[0][0]
     if planet_id == 1: data = (data - 2.9) % 360
     
     rasi_idx = int(data // 30)
@@ -52,62 +52,88 @@ def get_astro_position(planet_id, target_time):
     return rasi_name, data % 30, nak_name
 
 def get_fine_times(planet_id, target_nak):
-    search_hours = 360 if planet_id == 0 else 72
-    start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(hours=5, minutes=30)
+    now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    entry = None
-    entry_data = None # એન્ટ્રી વખતે રાશિ અને ડિગ્રી સાચવવા માટે
-    
-    # 1 મિનિટનો લૂપ
-    for i in range(0, search_hours * 60):
-        t_check = start + timedelta(minutes=i)
-        # get_nakshatra ને બદલે get_astro_position વાપરો
-        rasi, deg, nak = get_astro_position(planet_id, t_check)
-        if nak == target_nak:
-            entry = t_check
-            entry_data = (rasi, deg) # અહીં ડેટા સાચવો
-            break
-            
-    if entry:
-        for k in range(1, 72 * 60):
-            t_exit = entry + timedelta(minutes=k)
+    if planet_id == 0:  # સૂર્ય માટે (લાંબો સમય નક્ષત્રમાં રહે છે)
+        start_search = now - timedelta(days=15)
+        entry = None
+        entry_data = None
+        for i in range(0, 15 * 24 + 48, 1):
+            t_check = start_search + timedelta(hours=i)
+            rasi, deg, nak = get_astro_position(planet_id, t_check)
+            if nak == target_nak:
+                entry = t_check
+                entry_data = (rasi, deg)
+                break
+        
+        if not entry:
+            return None, None, None, None
+
+        t_exit = entry + timedelta(days=1)
+        for _ in range(30 * 24):
             rasi_e, deg_e, nak_e = get_astro_position(planet_id, t_exit)
             if nak_e != target_nak:
-                # entry_data માંથી રાશિ અને ડિગ્રી રિટર્ન કરો
-                return entry, t_exit, entry_data[0], entry_data[1]
+                break
+            t_exit += timedelta(hours=1)
+        return entry, t_exit, entry_data[0], entry_data[1]
+
+    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - મિનિટ-વાઈઝ પરફેક્ટ સ્કેન)
+        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        entry = None
+        entry_data = None
+        for i in range(0, 72 * 60):  
+            t_check = start + timedelta(minutes=i)
+            rasi, deg, nak = get_astro_position(planet_id, t_check)
+            if nak == target_nak:
+                entry = t_check
+                entry_data = (rasi, deg)
+                break
                 
-    return None, None, None, None
+        if entry:
+            for k in range(1, 72 * 60):
+                t_exit = entry + timedelta(minutes=k)
+                rasi_e, deg_e, nak_e = get_astro_position(planet_id, t_exit)
+                if nak_e != target_nak:
+                    return entry, t_exit, entry_data[0], entry_data[1]
+                    
+        return None, None, None, None
 
 def run_tracker():
-    target_nak = ["આશ્લેષા", "મઘા", "જ્યેષ્ઠા", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+    target_naks = ["આશ્લેષા", "મઘા", "જ્યેષ્ઠა", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+    future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
+
     for p_id in [0, 1]:
         name = "સૂર્ય" if p_id == 0 else "ચંદ્ર"
-        entry_t, exit_t, rasi, deg = get_fine_times(p_id, target_nak)
-        
-        now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-        if entry_t and entry_t > now and entry_t < (now + timedelta(hours=24)):
-            # તારીખ આધારિત Unique ID
-            current_date_id = now.strftime('%Y%m%d')
-            alert_id = f"{target_nak}_{name}_{current_date_id}"
+        fut_rasi, _, fut_n = get_astro_position(p_id, future_time)
+
+        if fut_n in target_naks:
+            entry_t, exit_t, rasi, deg = get_fine_times(p_id, fut_n)
             
-            already_sent = False
-            if os.path.exists(HISTORY_FILE):
-                with open(HISTORY_FILE, "r") as f:
-                    if alert_id in f.read(): already_sent = True
-            
-            if not already_sent:
-                msg = (f"🌟 એડવાન્સ એલર્ટ: {target_nak} - {name}\n"
-                       f"આગામી ૨૪ કલાકમાં {name} આ નક્ષત્રમાં પ્રવેશ કરશે.\n"
-                       f"પ્રવેશ સમય: {entry_t.strftime('%d %b, %H:%M')}\n"
-                       f"પ્રવેશ સ્થિતિ: {rasi} રાશિમાં {format_dms(deg)}\n"
-                       f"નિર્ગમન સમય: {exit_t.strftime('%d %b, %H:%M')}")
+            if entry_t and exit_t:
+                # સૂર્ય માટે નિર્ગમન તારીખ આધારિત યુનિક ID, ચંદ્ર માટે પ્રવેશ સમય આધારિત ID
+                if p_id == 0:
+                    alert_id = f"{fut_n}_{name}_{exit_t.strftime('%Y%m%d_%H%M')}"
+                else:
+                    alert_id = f"{fut_n}_{name}_{entry_t.strftime('%Y%m%d_%H%M')}"
                 
-                if TELEGRAM_TOKEN:
-                    requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
-                create_calendar_event(f"નવતારા: {target_nak}", msg)
+                already_sent = False
+                if os.path.exists(HISTORY_FILE):
+                    with open(HISTORY_FILE, "r") as f:
+                        if alert_id in f.read(): already_sent = True
                 
-                with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
-                print(f"✅ મોકલાયું: {alert_id}")
+                if not already_sent:
+                    msg = (f"🌟 એડવાન્સ એલર્ટ: {fut_n} - {name}\n"
+                           f"આગામી ૧૨ કલાકમાં {name} આ નક્ષત્રમાં પ્રવેશ કરશે.\n"
+                           f"પ્રવેશ સમય: {entry_t.strftime('%d %b, %H:%M')}\n"
+                           f"પ્રવેશ સ્થિતિ: {rasi} રાશિમાં {format_dms(deg)}\n"
+                           f"નિર્ગમન સમય: {exit_t.strftime('%d %b, %H:%M')}")
+                    
+                    if TELEGRAM_TOKEN:
+                        requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
+                    create_calendar_event(f"નવતારા: {fut_n}", msg)
+                    
+                    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
+                    print(f"✅ મોકલાયું: {alert_id}")
 
 if __name__ == "__main__":
     run_tracker()
