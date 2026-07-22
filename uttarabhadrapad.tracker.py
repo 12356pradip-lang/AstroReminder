@@ -110,11 +110,11 @@ def run_tracker():
             entry_t, exit_t, rasi, deg = get_fine_times(p_id, fut_n)
             
             if entry_t and exit_t:
-                # સૂર્ય માટે નિર્ગમન તારીખ આધારિત યુનિક ID, ચંદ્ર માટે પ્રવેશ સમય આધારિત ID
+                # સૂર્ય માટે સમય/મિનિટ કાઢીને માત્ર તારીખ રાખવી, ચંદ્ર માટે મિનિટ કાઢીને કલાક સુધીનું રાખવું જેથી ડુપ્લિકેટ ન બને
                 if p_id == 0:
-                    alert_id = f"{fut_n}_{name}_{exit_t.strftime('%Y%m%d_%H%M')}"
+                    alert_id = f"{fut_n}_{name}_{exit_t.strftime('%Y%m%d')}"
                 else:
-                    alert_id = f"{fut_n}_{name}_{entry_t.strftime('%Y%m%d_%H%M')}"
+                    alert_id = f"{fut_n}_{name}_{entry_t.strftime('%Y%m%d_%H')}"
                 
                 already_sent = False
                 if os.path.exists(HISTORY_FILE):

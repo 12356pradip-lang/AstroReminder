@@ -91,10 +91,12 @@ def run_tracker():
                 # સૂર્ય માટે નિર્ગમન તારીખ સુધી એલર્ટ લોક રાખવું જેથી રિપીટ ન થાય, ચંદ્ર માટે એન્ટ્રી ટાઇમ બેઝ્ડ આઈડી
                 if p_id == 0:
                     _, exit_str = get_fine_times(p_id, fut_n)
-                    alert_id = f"{p_name}_{fut_n}_{exit_str}"
+                    # સૂર્ય માટે મિનિટ/સમય કાઢીને માત્ર તારીખ રાખવી જેથી ડુપ્લિકેટ ન બને
+                    alert_id = f"{p_name}_{fut_n}_{exit_str[:6]}"
                 else:
                     entry_str, _ = get_fine_times(p_id, fut_n)
-                    alert_id = f"{p_name}_{fut_n}_{entry_str}"
+                    # ચંદ્ર માટે મિનિટ કાઢીને માત્ર કલાક સુધીનું રાખવું જેથી મિનિટ બદલાવાથી ડુપ્લિકેટ ન બને
+                    alert_id = f"{p_name}_{fut_n}_{entry_str[:10]}"
 
                 if is_alert_sent(alert_id): continue
                 

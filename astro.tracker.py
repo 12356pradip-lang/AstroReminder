@@ -126,12 +126,12 @@ def run_tracker():
         for entry in PUSHKAR_DATA:
             entry_time, exit_time = get_fine_transition(p_id, entry)
             if entry_time and exit_time:
-                # સૂર્ય માટે નિર્ગમન સમય આધારિત ID, ચંદ્ર માટે પ્રવેશ સમય આધારિત ID
+                # સૂર્ય માટે સમય/મિનિટ કાઢીને માત્ર તારીખ રાખવી, ચંદ્ર માટે મિનિટ કાઢીને કલાક સુધીનું રાખવું જેથી ડુપ્લિકેટ ન બને
                 if p_id == 0:
-                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{exit_time.strftime('%Y%m%d_%H%M')}"
+                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{exit_time.strftime('%Y%m%d')}"
                 else:
-                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{entry_time.strftime('%Y%m%d_%H%M')}"
-
+                    alert_id = f"{name}_{entry['nakshatra']}_{entry['pada']}_{entry_time.strftime('%Y%m%d_%H')}"
+                
                 if not is_alert_sent(alert_id):
                     # આગામી ૨૪ કલાકમાં પ્રવેશ થતો હોય તો જ એલર્ટ મોકલવું (મૂળ શરત મુજબ)
                     if entry_time > now and entry_time < (now + timedelta(hours=24)):
