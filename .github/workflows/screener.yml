@@ -1,0 +1,41 @@
+name: Daily Nifty 200 Screener
+
+on:
+  schedule:
+    # 04:15 UTC = 09:45 AM IST (Monday to Friday)
+    - cron: '15 4 * * 1-5'
+    # 09:30 UTC = 03:00 PM IST (Monday to Friday)
+    - cron: '30 9 * * 1-5'
+  
+  # GitHub પરથી મેન્યુઅલી બટન દબાવીને પણ રન કરી શકાય
+  workflow_dispatch:
+
+jobs:
+  run-screener:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install yfinance pandas pyyaml numpy
+
+      - name: Run Nifty 200 Screener
+        run: |
+          python main_screener.py
+
+      - name: Commit and Push Results CSV to GitHub
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add nifty200_screening_results.csv
+          git commit -m "Auto-update screening results [Skip CI]" || exit 0
+          git push
