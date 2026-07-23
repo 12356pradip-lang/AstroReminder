@@ -8,10 +8,18 @@ import urllib.parse
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
 LAT, LON = 22.2735, 70.7513
+HISTORY_FILE = "tithi_alert_history.txt"
 
 def format_dms(deg):
     d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
+
+def is_alert_sent(alert_id):
+    if not os.path.exists(HISTORY_FILE): return False
+    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
+
+def mark_alert_sent(alert_id):
+    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
 def get_celestial_info(jd, planet_id):
     swe.set_topo(LON, LAT, 0)
@@ -21,7 +29,7 @@ def get_celestial_info(jd, planet_id):
     if planet_id == 1: data = (data - 2.9) % 360
     
     rasi_idx = int(data // 30) % 12
-    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "ຄુંભ", "મીન"]
+    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
     rasi_name = rashis[rasi_idx]
     rasi_deg = data % 30
     
@@ -44,7 +52,6 @@ def run_tithi_tracker():
     moon_info = ""
     final_diff = 0.0
     
-    # 24 કલાક (1440 મિનિટ) નું સ્કેનિંગ જેથી શરૂઆત અને અંત બંને ચોક્કસ મળે
     for i in range(-120, 1440):
         t_check = start + timedelta(minutes=i)
         target_utc = t_check - timedelta(hours=5, minutes=30)
@@ -74,21 +81,29 @@ def run_tithi_tracker():
             break
             
     if found_tithi and not tithi_end_time:
-        tithi_end_time = tithi_start_time + timedelta(hours=12) # સેફ્ટી ફોલબેક
+        tithi_end_time = tithi_start_time + timedelta(hours=12)
 
     if found_tithi and tithi_start_time:
-        msg = (f"🌟 {found_tithi} એડવાન્સ એલર્ટ\n"
-               f"--------------------------------------------------\n"
-               f"શરૂઆત સમય: {tithi_start_time.strftime('%d %b, %A, %H:%M')}\n"
-               f"સમાપ્તિ સમય: {tithi_end_time.strftime('%d %b, %A, %H:%M') if tithi_end_time else 'જલ્દી જ'}\n\n"
-               f"☀️ સૂર્ય: {sun_info}\n"
-               f"🌙 ચંદ્ર: {moon_info}\n"
-               f"ડિગ્રી તફાવત: {final_diff:.2f}°")
+        # યુનિક આઈડી બનાવવું (દા.ત. પૂર્ણિમા_2026_07_23) જેથી ડુપ્લિકેટ એલર્ટ ન જાય
+        alert_id = f"{found_tithi}_{tithi_start_time.strftime('%Y_%m_%d')}"
         
-        print(f"\n{msg}\n")
-        if TELEGRAM_TOKEN:
-            requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}")
-        print(f"✅ એલર્ટ મોકલાયું: {found_tithi}")
+        if not is_alert_sent(alert_id):
+            msg = (f"🌟 {found_tithi} એડવાન્સ એલર્ટ\n"
+                   f"--------------------------------------------------\n"
+                   f"શરૂઆત સમય: {tithi_start_time.strftime('%d %b, %A, %H:%M')}\n"
+                   f"સમાપ્તિ સમય: {tithi_end_time.strftime('%d %b, %A, %H:%M') if tithi_end_time else 'જલ્દી જ'}\n\n"
+                   f"☀️ સૂર્ય: {sun_info}\n"
+                   f"🌙 ચંદ્ર: {moon_info}\n"
+                   f"ડિગ્રી તફાવત: {final_diff:.2f}°")
+            
+            print(f"\n{msg}\n")
+            if TELEGRAM_TOKEN:
+                requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}")
+            
+            mark_alert_sent(alert_id)
+            print(f"✅ એલર્ટ મોકલાયું અને હિસ્ટ્રીમાં સેવ થયું: {found_tithi}")
+        else:
+            print(f"ℹ️ આ {found_tithi} નું એલર્ટ અગાઉથી મોકલાઈ ગયેલ છે, તેથી ડુપ્લિકેટ એલર્ટ રદ કર્યું.")
 
 if __name__ == "__main__":
     run_tithi_tracker()
