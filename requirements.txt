@@ -4,3 +4,8 @@ google-auth-httplib2
 google-auth-oauthlib
 pytz
 requests
+yfinance
+pandas
+numpy
+requests
+pyyaml
