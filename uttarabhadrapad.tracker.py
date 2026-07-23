@@ -52,16 +52,13 @@ def get_astro_position(planet_id, target_time):
     res = swe.calc_ut(jd, planet_id, flags)
     total_deg = res[0][0]  # કુલ નિરયણ ડિગ્રી (0 થી 360)
     
-    # ૪. ચંદ્ર માટેનું ખાસ કરેક્શન જો લાગુ પડતું હોય (અહીં મૂળ કોડ મુજબ જ રાખી શકાય અથવા ટોટલ ડિગ્રી વાપરી શકાય)
-    # (નોંધ: આપણે ફાઇનલ ટેસ્ટિંગમાં જોયું કે સીધી કુલ નિરયણ ડિગ્રી એકદમ પરફેક્ટ પરિણામ આપે છે)
-    
-    # ૫. રાશિ અને રાશિની ડિગ્રી ગણતરી
+    # ૪. રાશિ અને રાશિની ડિગ્રી ગણતરી
     rasi_idx = int(total_deg // 30) % 12
     rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
     rasi_name = rashis[rasi_idx]
     rasi_deg = total_deg % 30
     
-    # ૬. નક્ષત્ર અને ચરણ ગણતરી
+    # ૫. નક્ષત્ર અને ચરણ ગણતરી
     nak_span = 360.0 / 27.0  # 13.333333333333334
     nak_idx = int(total_deg // nak_span) % 27
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
@@ -100,8 +97,8 @@ def get_fine_times(planet_id, target_nak):
             t_exit += timedelta(hours=1)
         return entry, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
 
-    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - મિનિટ-વાઈઝ પરફેક્ટ સ્કેન)
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - 30 કલાકની પરફેક્ટ લિમિટ)
+        start = now - timedelta(days=2)
         entry = None
         entry_data = None
         for i in range(0, 72 * 60):  
@@ -113,7 +110,8 @@ def get_fine_times(planet_id, target_nak):
                 break
                 
         if entry:
-            for k in range(1, 72 * 60):
+            # ચંદ્ર માટે લૂપ માત્ર 30 કલાક (1800 મિનિટ) ની જ રાખવી જેથી ખોટો સમય ન પકડાય
+            for k in range(1, 30 * 60):
                 t_exit = entry + timedelta(minutes=k)
                 rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_exit)
                 if nak_e != target_nak:
@@ -144,7 +142,6 @@ def run_tracker():
                         if alert_id in f.read(): already_sent = True
                 
                 if not already_sent:
-                    # અહીં પ્રિન્ટ આઉટપુટ અને મેસેજમાં નિરયણ ડિગ્રી અને પંચાંગની સુંદર વિગતો ઉમેરવામાં આવી છે
                     msg = (f"🌟 એડવાન્સ એલર્ટ: {fut_n} - {name}\n"
                            f"આગામી ૧૨ કલાકમાં {name} આ નક્ષત્રમાં પ્રવેશ કરશે.\n"
                            f"પ્રવેશ સમય: {entry_t.strftime('%d %b, %H:%M')}\n"
