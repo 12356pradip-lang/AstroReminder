@@ -9,8 +9,8 @@ technical_criteria:
   ema_mid: 50            # Mid EMA
   ema_slow: 200          # Major Support EMA
   junction_threshold: 0.025 # Strict 2.5% limit for EMA Squeeze / Junction
-  rsi_min: 50.0          # Strong Bullish Weekly RSI (Increased from 45)
-  rsi_max: 68.0
+  rsi_min: 55.0          # Strong Bullish Weekly RSI (Increased from 45)
+  rsi_max: 60.0
 
 fundamental_criteria:
   min_roe: 18.0          # Strict Min Return on Equity (Increased to 18%)
@@ -19,6 +19,9 @@ fundamental_criteria:
   min_rev_growth: 10.0   # Min Revenue Growth (%)
   min_profit_growth: 12.0 # Min Profit Growth (%)
   require_fa_growth: true # Fixed Assets Growth mandatory
+  # 🚀 Future Growth Capital Expansion Filters:
+  min_cwip_ratio: 0.10          # Min 10% Capital Blocked in CWIP for Expansion
+  min_asset_expansion: 12.0     # Min 12% Growth in Fixed Assets / Gross Block
 
 scoring_rules:
   min_score_pass: 8      # Extreme Strict: Min Score 8/9 for Strong Buy!
