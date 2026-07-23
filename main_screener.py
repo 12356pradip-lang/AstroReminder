@@ -1,4 +1,5 @@
 import os
+import time
 import yaml
 import requests
 import yfinance as yf
@@ -49,12 +50,12 @@ def send_telegram_alert(df_output, csv_filename):
     try:
         # 1. Send Text Summary
         text_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        requests.post(text_url, data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"})
+        requests.post(text_url, data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=10)
 
         # 2. Send CSV File Document
         doc_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
         with open(csv_filename, 'rb') as f:
-            requests.post(doc_url, data={"chat_id": chat_id}, files={"document": f})
+            requests.post(doc_url, data={"chat_id": chat_id}, files={"document": f}, timeout=15)
 
         print("📱 High-Conviction Telegram Alert Sent!")
     except Exception as e:
@@ -171,7 +172,27 @@ def analyze_fundamentals(stock_obj, config):
     }
 
 # ----------------------------------------------------
-# 5. Main Screener Execution
+# 5. Safe History Fetcher (With Fallback mechanism)
+# ----------------------------------------------------
+def fetch_safe_history(stock_obj, config):
+    """
+    અહીં 5y/રિક્વેસ્ટ કરેલો પિરિયડ ના મળે તો ઓટોમેટિક fallback ટ્રાય કરશે,
+    જેથી Yahoo 404 Error ન આપે.
+    """
+    req_period = config['data_settings']['period']
+    req_interval = config['data_settings']['interval']
+    
+    try:
+        df = stock_obj.history(period=req_period, interval=req_interval)
+        if df is None or df.empty:
+            # Fallback to max data if requested period (e.g. 5y) fails for new stocks like ZOMATO
+            df = stock_obj.history(period="max", interval=req_interval)
+        return df
+    except Exception:
+        return pd.DataFrame()
+
+# ----------------------------------------------------
+# 6. Main Screener Execution
 # ----------------------------------------------------
 def run_screener():
     print("=" * 80)
@@ -193,11 +214,13 @@ def run_screener():
         
         try:
             stock = yf.Ticker(symbol)
-            df_weekly = stock.history(
-                period=config['data_settings']['period'], 
-                interval=config['data_settings']['interval']
-            )
             
+            # Safe history fetch to avoid 404 Errors
+            df_weekly = fetch_safe_history(stock, config)
+            
+            if df_weekly.empty:
+                continue
+
             tech_res = analyze_weekly_ema_junction(df_weekly, config)
             fund_res = analyze_fundamentals(stock, config)
 
@@ -231,8 +254,11 @@ def run_screener():
             }
             final_reports.append(row)
 
-        except Exception:
+        except Exception as e:
             continue
+        finally:
+            # 💡 Yahoo Finance Rate Limiting બચવા માટે ૧ સેકન્ડ પોઝ (ખૂબ જરૂરી)
+            time.sleep(1.0)
 
     print("\n\n✅ Scanning Completed Successfully!\n")
     
