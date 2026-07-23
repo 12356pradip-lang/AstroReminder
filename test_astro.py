@@ -30,12 +30,16 @@ def get_detailed_astro_data(planet_id, planet_name):
     pada_span = nak_span / 4.0
     pada = int(nak_deg // pada_span) + 1
     
-    print(f"--- {planet_name} ---")
+    print(f"========================================")
+    print(f"ગ્રહ : {planet_name}")
     print(f"કુલ નિરયણ ડિગ્રી        : {total_deg:.2f}°")
     print(f"રાશિ                   : {rashis[rasi_idx]} (રાશિ ડિગ્રી: {rasi_deg:.2f}°)")
-    print(f"નક્ષત્ર                 : {nakshatras[nak_idx]} - {pada} (નક્ષત્ર ડિગ્રી: {nak_deg:.2f}°)\n")
+    print(f"નક્ષત્ર                 : {nakshatras[nak_idx]} - {pada} (નક્ષત્ર ડિગ્રી: {nak_deg:.2f}°)")
+    print(f"========================================\n")
 
 if __name__ == "__main__":
-    # સૂર્ય અને ચંદ્ર બંને માટે અલગથી કોલ કરો જેથી ચોક્કસ આઉટપુટ મળે
+    # સૂર્ય માટે (ID: 0)
     get_detailed_astro_data(0, "સૂર્ય (Sun)")
+    
+    # ચંદ્ર માટે (ID: 1)
     get_detailed_astro_data(1, "ચંદ્ર (Moon)")
