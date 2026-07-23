@@ -19,34 +19,35 @@ def load_config(config_path="config.yml"):
         return yaml.safe_load(f)
 
 # ----------------------------------------------------
-# 2. Telegram Alert Integration (Direct Credentials)
+# 2. Telegram Alert Integration (Only High-Conviction)
 # ----------------------------------------------------
 def send_telegram_alert(df_output, csv_filename):
-    """
-    Sends Alert summary and attaches complete CSV directly to Telegram
-    """
-    # Direct Telegram Credentials
     bot_token = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
     chat_id = "478006282"
 
-    df_filtered = df_output[df_output['Signal'].str.contains("STRONG BUY|WATCHLIST")]
+    # Strict Filter: Only Strong Buy Stocks for Telegram Summary
+    df_strong = df_output[df_output['Signal'].str.contains("STRONG BUY")].copy()
 
-    msg = f"🚀 *NIFTY 200 SCREENING REPORT*\n"
+    msg = f"🌟 *TOP PRIORITY CREAM STOCKS*\n"
     msg += f"📅 {datetime.now().strftime('%d-%b-%Y | %I:%M %p')}\n"
     msg += "─────────────────────────\n\n"
 
-    if not df_filtered.empty:
-        for idx, row in df_filtered.iterrows():
-            msg += f"*{row['Signal']}*: `{row['Symbol']}`\n"
-            msg += f"📊 Score: {row['Total Score']} | RSI: {row['W-RSI']}\n"
-            msg += f"🎯 Correction End: {row['Correction End?']}\n\n"
+    if not df_strong.empty:
+        # Sort by Raw Numerical Score & RSI
+        for idx, row in df_strong.iterrows():
+            msg += f"🔥 *{row['Symbol']}*\n"
+            msg += f"📊 Score: `{row['Total Score']}` | RSI: `{row['W-RSI']}`\n"
+            msg += f"📈 Pattern: `{row['EMA Pattern']}` | Vol Spike: `{row['Volume Spike']}`\n"
+            msg += f"🎯 ROE: `{row['ROE (%)']}%` | D/E: `{row['D/E']}`\n"
+            msg += "─────────────────────────\n"
     else:
-        msg += "⚠️ આજે કોઈ સ્ટોક ક્રાઈટેરિયામાં મેચ થયો નથી.\n\n"
+        msg += "⚠️ *આજે કોઈ સ્ટોક એક્સ્ટ્રીમ-સ્ટ્રિક્ટ ક્રાઈટેરિયામાં મેચ થયો નથી.*\n"
+        msg += "💡 (નકામા સિગ્નલથી બચવા માટે સિસ્ટમ શાંત રહી છે).\n\n"
 
-    msg += "📁 *વધુ વિગત માટે નીચે આપેલી CSV ફાઇલો ડાઉનલોડ કરીને જુઓ.*"
+    msg += "\n📁 *આખી Nifty 200 ફાઈલ જોવા માટે નીચે આપેલી CSV ડાઉનલોડ કરો.*"
 
     try:
-        # 1. Send Text Summary Message
+        # 1. Send Text Summary
         text_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         requests.post(text_url, data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"})
 
@@ -55,12 +56,12 @@ def send_telegram_alert(df_output, csv_filename):
         with open(csv_filename, 'rb') as f:
             requests.post(doc_url, data={"chat_id": chat_id}, files={"document": f})
 
-        print("📱 Telegram Alert & CSV File sent successfully!")
+        print("📱 High-Conviction Telegram Alert Sent!")
     except Exception as e:
         print(f"❌ Failed to send Telegram alert: {e}")
 
 # ----------------------------------------------------
-# 3. Phase 1: Technical & Weekly EMA Junction
+# 3. Technical & Weekly EMA Junction + Volume
 # ----------------------------------------------------
 def analyze_weekly_ema_junction(df_weekly, config):
     tc = config['technical_criteria']
@@ -70,13 +71,15 @@ def analyze_weekly_ema_junction(df_weekly, config):
             "Tech_Score": 0, 
             "EMA_Status": "Data Deficit", 
             "Correction_Ended": "NO",
-            "Weekly_RSI": 0.0
+            "Weekly_RSI": 0.0,
+            "Volume_Spike": "NO"
         }
 
     df_weekly['EMA20'] = df_weekly['Close'].ewm(span=tc['ema_fast'], adjust=False).mean()
     df_weekly['EMA50'] = df_weekly['Close'].ewm(span=tc['ema_mid'], adjust=False).mean()
     df_weekly['EMA200'] = df_weekly['Close'].ewm(span=tc['ema_slow'], adjust=False).mean()
 
+    # RSI Calculation
     delta = df_weekly['Close'].diff()
     gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
     loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
@@ -86,38 +89,38 @@ def analyze_weekly_ema_junction(df_weekly, config):
     latest = df_weekly.iloc[-1]
     prev = df_weekly.iloc[-2]
 
+    # Volume Filter
+    avg_volume = df_weekly['Volume'].tail(20).mean()
+    vol_spike = "YES" if latest['Volume'] > avg_volume * 1.2 else "NO"
+
     ema_diff = abs(latest['EMA20'] - latest['EMA50']) / latest['EMA50']
     is_ema_junction = ema_diff <= tc['junction_threshold']
 
     above_all_emas = (latest['Close'] > latest['EMA20']) and (latest['Close'] > latest['EMA50'])
     ema_crossover = (prev['EMA20'] <= prev['EMA50']) and (latest['EMA20'] > latest['EMA50'])
-    ema200_support_bounce = (prev['Low'] <= prev['EMA200']) and (latest['Close'] > latest['EMA200'])
+    ema200_bounce = (prev['Low'] <= prev['EMA200']) and (latest['Close'] > latest['EMA200'])
 
-    is_correction_ended = above_all_emas and (is_ema_junction or ema_crossover or ema200_support_bounce)
+    is_correction_ended = above_all_emas and (is_ema_junction or ema_crossover or ema200_bounce)
 
     rsi_ok = tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']
 
     tech_score = 0
     if above_all_emas: tech_score += 1
-    if is_ema_junction or ema_crossover: tech_score += 1
+    if is_ema_junction or ema_crossover or ema200_bounce: tech_score += 1
     if rsi_ok: tech_score += 1
 
-    if is_ema_junction:
-        junction_desc = "SQUEEZE"
-    elif ema_crossover:
-        junction_desc = "CROSSOVER"
-    else:
-        junction_desc = "SPREAD"
+    junction_desc = "SQUEEZE" if is_ema_junction else ("CROSSOVER" if ema_crossover else "SUPPORT BOUNCE")
 
     return {
         "Tech_Score": tech_score,
         "Weekly_RSI": round(latest['RSI'], 1),
         "EMA_Status": junction_desc,
-        "Correction_Ended": "YES 🎯" if is_correction_ended else "NO ⏳"
+        "Correction_Ended": "YES 🎯" if is_correction_ended else "NO ⏳",
+        "Volume_Spike": vol_spike
     }
 
 # ----------------------------------------------------
-# 4. Phase 2: Fundamental & Fixed Assets
+# 4. Strict Fundamental & Balance Sheet Check
 # ----------------------------------------------------
 def analyze_fundamentals(stock_obj, config):
     fc = config['fundamental_criteria']
@@ -168,11 +171,11 @@ def analyze_fundamentals(stock_obj, config):
     }
 
 # ----------------------------------------------------
-# 5. Phase 3: Main Execution Pipeline
+# 5. Main Screener Execution
 # ----------------------------------------------------
 def run_screener():
     print("=" * 80)
-    print(f"🚀 NIFTY 200 SCREENER RUNNING | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🚀 ULTRA-CREAM NIFTY 200 SCREENER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
 
     config = load_config("config.yml")
@@ -198,14 +201,15 @@ def run_screener():
             tech_res = analyze_weekly_ema_junction(df_weekly, config)
             fund_res = analyze_fundamentals(stock, config)
 
-            total_score = tech_res.get('Tech_Score', 0) + fund_res.get('Fund_Score', 0)
+            raw_total_score = tech_res.get('Tech_Score', 0) + fund_res.get('Fund_Score', 0)
             
-            pass_mark = config['scoring_rules']['min_score_pass']
-            watch_mark = config['scoring_rules']['watch_score_pass']
+            pass_mark = config['scoring_rules']['min_score_pass'] # 8
+            watch_mark = config['scoring_rules']['watch_score_pass'] # 7
 
-            if total_score >= pass_mark and tech_res.get('Correction_Ended') == "YES 🎯":
+            # Ultra-Strict Buy Criteria
+            if raw_total_score >= pass_mark and tech_res.get('Correction_Ended') == "YES 🎯":
                 decision = "🟢 STRONG BUY"
-            elif total_score >= watch_mark:
+            elif raw_total_score >= watch_mark:
                 decision = "🟡 WATCHLIST"
             else:
                 decision = "🔴 REJECT"
@@ -213,11 +217,13 @@ def run_screener():
             row = {
                 "Symbol": symbol,
                 "Signal": decision,
-                "Correction End?": tech_res.get('Correction_Ended', 'N/A'),
-                "Total Score": f"{total_score}/9",
+                "RawScore": raw_total_score,
+                "Total Score": f"{raw_total_score}/9",
                 "Tech Score": f"{tech_res.get('Tech_Score', 0)}/3",
                 "Fund Score": f"{fund_res.get('Fund_Score', 0)}/6",
+                "Correction End?": tech_res.get('Correction_Ended', 'N/A'),
                 "EMA Pattern": tech_res.get('EMA_Status', 'N/A'),
+                "Volume Spike": tech_res.get('Volume_Spike', 'NO'),
                 "W-RSI": tech_res.get('Weekly_RSI', 'N/A'),
                 "ROE (%)": fund_res.get('ROE (%)', 'N/A'),
                 "D/E": fund_res.get('D/E', 'N/A'),
@@ -236,10 +242,13 @@ def run_screener():
         print("⚠️ No data processed.")
         return
 
+    # Sort Output by RawScore Highest to Lowest
+    df_output = df_output.sort_values(by="RawScore", ascending=False).drop(columns=["RawScore"])
+
     output_filename = "nifty200_screening_results.csv"
     df_output.to_csv(output_filename, index=False)
     
-    # Send directly to Telegram
+    # Send High-Conviction Summary to Telegram
     send_telegram_alert(df_output, output_filename)
 
 if __name__ == "__main__":

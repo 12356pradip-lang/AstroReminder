@@ -1,4 +1,4 @@
-# Trading System Configuration for Nifty 200
+# Strict Trading System Configuration for Nifty 200
 
 data_settings:
   period: "5y"           # 5-Year data for Stable Weekly EMA 200 & Fixed Assets
@@ -8,21 +8,21 @@ technical_criteria:
   ema_fast: 20           # Fast EMA
   ema_mid: 50            # Mid EMA
   ema_slow: 200          # Major Support EMA
-  junction_threshold: 0.03 # 3% limit for EMA Squeeze / Junction
-  rsi_min: 45.0          # Bullish Weekly RSI
-  rsi_max: 70.0
+  junction_threshold: 0.025 # Strict 2.5% limit for EMA Squeeze / Junction
+  rsi_min: 50.0          # Strong Bullish Weekly RSI (Increased from 45)
+  rsi_max: 68.0
 
 fundamental_criteria:
-  min_roe: 15.0          # Min Return on Equity (%)
-  max_debt_equity: 0.5   # Max Debt/Equity
-  min_promoter: 45.0     # Min Promoter Holding (%)
-  min_rev_growth: 8.0    # Min Revenue Growth (%)
-  min_profit_growth: 10.0 # Min Profit Growth (%)
+  min_roe: 18.0          # Strict Min Return on Equity (Increased to 18%)
+  max_debt_equity: 0.3   # Low Debt limit (Reduced to 0.3)
+  min_promoter: 50.0     # Min Promoter Holding (%)
+  min_rev_growth: 10.0   # Min Revenue Growth (%)
+  min_profit_growth: 12.0 # Min Profit Growth (%)
   require_fa_growth: true # Fixed Assets Growth mandatory
 
 scoring_rules:
-  min_score_pass: 7      # Combined Score >= 7 out of 9 for Strong Buy
-  watch_score_pass: 5    # Score 5 or 6 for Watchlist
+  min_score_pass: 8      # Extreme Strict: Min Score 8/9 for Strong Buy!
+  watch_score_pass: 7    # Score 7 for Watchlist
 
 watchlist:
   - "3MINDIA.NS"
@@ -200,8 +200,6 @@ watchlist:
   - "TATACOMM.NS"
   - "TATACONSUM.NS"
   - "TATAELEXSI.NS"
-  - "TATAMTRDVR.NS"
-  - "TATAMOTORS.NS"
   - "TATAPOWER.NS"
   - "TATASTEEL.NS"
   - "TCS.NS"
