@@ -21,7 +21,7 @@ def test_astro_position(planet_id, planet_name):
     nak_deg = data % 13.333333333333334
     pada = int(nak_deg // 3.3333333333333335) + 1
     
-    print(f"--- {planet_name} ટેસ્ટ રિઝલ્ટ ---")
+    print(f"================== {planet_name} ==================")
     print(f"તારીખ/સમય: {now.strftime('%d %b %Y, %H:%M')}")
     print(f"રાશિ: {rashis[rasi_idx]}")
     print(f"નક્ષત્ર: {nakshatras[nak_idx % 27]}")
@@ -29,5 +29,5 @@ def test_astro_position(planet_id, planet_name):
     print(f"નક્ષત્ર ડિગ્રી: {nak_deg:.2f}°\n")
 
 if __name__ == "__main__":
-    test_astro_position(0, "સૂર્ય")
-    test_astro_position(1, "ચંદ્ર")
+    test_astro_position(0, "સૂર્ય (Sun)")
+    test_astro_position(1, "ચંદ્ર (Moon)")
