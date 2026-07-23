@@ -4,12 +4,6 @@ data_settings:
   period: "5y"           # 5-Year data for Stable Weekly EMA 200 & Fixed Assets
   interval: "1wk"        # Weekly chart for Correction End detection
 
-schedule_settings:
-  runs_per_day: 2
-  times_ist:
-    - "09:45 AM"
-    - "03:00 PM"
-
 technical_criteria:
   ema_fast: 20           # Fast EMA
   ema_mid: 50            # Mid EMA
