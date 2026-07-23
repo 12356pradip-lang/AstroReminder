@@ -2,6 +2,7 @@ import swisseph as swe
 from datetime import datetime, timedelta, timezone
 import requests
 import os
+import urllib.parse
 
 # કોન્ફિગરેશન
 TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
@@ -13,16 +14,24 @@ def format_dms(deg):
     return f"{d}°{m}'{s}\""
 
 def get_celestial_info(jd, planet_id):
-    # planet_id: 0 for Sun, 1 for Moon
-    data = swe.calc_ut(jd, planet_id, swe.FLG_SIDEREAL)[0][0]
-    rasi_idx = int(data // 30)
-    rasi_name = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"][rasi_idx]
+    swe.set_topo(LON, LAT, 0)
+    flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
+    data = swe.calc_ut(jd, planet_id, flags)[0][0]
     
+    if planet_id == 1: data = (data - 2.9) % 360
+    
+    rasi_idx = int(data // 30) % 12
+    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "ຄુંભ", "મીન"]
+    rasi_name = rashis[rasi_idx]
+    rasi_deg = data % 30
+    
+    nak_span = 360.0 / 27.0
+    nak_idx = int(data // nak_span) % 27
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    nak_name = nakshatras[int(data // 13.333333333333334) % 27]
-    nak_deg = data % 13.333333333333334
+    nak_name = nakshatras[nak_idx]
+    nak_deg = data % nak_span
     
-    return f"{rasi_name} રાશિ, {format_dms(data % 30)} | {nak_name} નક્ષત્ર, {format_dms(nak_deg)}"
+    return f"{rasi_name} રાશિ (રાશિ ડિગ્રી: {format_dms(rasi_deg)}) | {nak_name} નક્ષત્ર (નક્ષત્ર ડિગ્રી: {format_dms(nak_deg)})", data
 
 def run_tithi_tracker():
     swe.set_sid_mode(swe.SIDM_LAHIRI)
@@ -30,39 +39,56 @@ def run_tithi_tracker():
     
     found_tithi = None
     tithi_start_time = None
+    tithi_end_time = None
+    sun_info = ""
+    moon_info = ""
+    final_diff = 0.0
     
-    for i in range(0, 12 * 60):
+    # 24 કલાક (1440 મિનિટ) નું સ્કેનિંગ જેથી શરૂઆત અને અંત બંને ચોક્કસ મળે
+    for i in range(-120, 1440):
         t_check = start + timedelta(minutes=i)
-        jd = swe.julday(t_check.year, t_check.month, t_check.day, t_check.hour + t_check.minute/60.0)
+        target_utc = t_check - timedelta(hours=5, minutes=30)
+        jd = swe.julday(target_utc.year, target_utc.month, target_utc.day, 
+                        target_utc.hour + target_utc.minute/60.0 + target_utc.second/3600.0)
         
-        sun = swe.calc_ut(jd, 0, swe.FLG_SIDEREAL)[0][0]
-        moon = swe.calc_ut(jd, 1, swe.FLG_SIDEREAL)[0][0]
-        diff = (moon - sun) % 360
+        swe.set_topo(LON, LAT, 0)
+        flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
+        
+        sun_data = swe.calc_ut(jd, 0, flags)[0][0]
+        moon_data = swe.calc_ut(jd, 1, flags)[0][0]
+        diff = (moon_data - sun_data) % 360
         
         tithi_type = None
-        if 179.5 < diff < 180.5: tithi_type = "પૂર્ણિમા"
-        elif diff < 0.5 or diff > 359.5: tithi_type = "અમાસ"
+        if 179.0 <= diff <= 181.0: tithi_type = "પૂર્ણિમા"
+        elif diff <= 1.0 or diff >= 359.0: tithi_type = "અમાસ"
         
         if tithi_type and not found_tithi:
             found_tithi = tithi_type
             tithi_start_time = t_check
-            # વિગતો એકત્રિત કરો
-            sun_info = get_celestial_info(jd, 0)
-            moon_info = get_celestial_info(jd, 1)
+            sun_info, _ = get_celestial_info(jd, 0)
+            moon_info, _ = get_celestial_info(jd, 1)
+            final_diff = diff
         
-        # સમાપ્તિ સમય શોધવા માટે
-        if found_tithi and tithi_type != found_tithi:
-            end_time = t_check
-            msg = (f"🌟 {found_tithi} એલર્ટ\n"
-                   f"શરૂઆત: {tithi_start_time.strftime('%d %b, %A, %H:%M')}\n"
-                   f"સમાપ્તિ: {end_time.strftime('%d %b, %A, %H:%M')}\n\n"
-                   f"☀️ સૂર્ય: {sun_info}\n"
-                   f"🌙 ચંદ્ર: {moon_info}\n"
-                   f"તફાવત: {diff:.2f}°")
-            
-            requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg}")
-            print(f"✅ એલર્ટ મોકલાયું: {found_tithi}")
+        if found_tithi and tithi_type != found_tithi and tithi_start_time and t_check > tithi_start_time:
+            tithi_end_time = t_check
             break
+            
+    if found_tithi and not tithi_end_time:
+        tithi_end_time = tithi_start_time + timedelta(hours=12) # સેફ્ટી ફોલબેક
+
+    if found_tithi and tithi_start_time:
+        msg = (f"🌟 {found_tithi} એડવાન્સ એલર્ટ\n"
+               f"--------------------------------------------------\n"
+               f"શરૂઆત સમય: {tithi_start_time.strftime('%d %b, %A, %H:%M')}\n"
+               f"સમાપ્તિ સમય: {tithi_end_time.strftime('%d %b, %A, %H:%M') if tithi_end_time else 'જલ્દી જ'}\n\n"
+               f"☀️ સૂર્ય: {sun_info}\n"
+               f"🌙 ચંદ્ર: {moon_info}\n"
+               f"ડિગ્રી તફાવત: {final_diff:.2f}°")
+        
+        print(f"\n{msg}\n")
+        if TELEGRAM_TOKEN:
+            requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}")
+        print(f"✅ એલર્ટ મોકલાયું: {found_tithi}")
 
 if __name__ == "__main__":
     run_tithi_tracker()
