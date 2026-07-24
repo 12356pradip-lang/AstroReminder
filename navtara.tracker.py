@@ -161,14 +161,16 @@ def run_tracker():
                 entry_t, exit_t, rasi, r_deg, pada, n_deg, total_deg = get_fine_times(p_id, fut_n)
                 
                 if entry_t and exit_t:
-                    # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (nishit.navtara.py મુજબ જ)
-                    msg = (f"🌟 એડવાન્સ એલર્ટ: {tara} - {p_name}\n"
-                           f"આગામી ૧૨ કલાકમાં {p_name} આ નક્ષત્રમાં પ્રવેશ કરશે.\n"
-                           f"પ્રવેશ સમય: {entry_t.strftime('%d %b, %H:%M')}\n"
-                           f"કુલ નિરયણ ડિગ્રી        : {total_deg:.2f}°\n"
-                           f"પ્રવેશ સ્થિતિ: {rasi} રાશિ (રાશિ ડિગ્રી: {r_deg:.2f}°)\n"
-                           f"નક્ષત્ર સ્થિતિ: {fut_n} - {pada} (નક્ષત્ર ડિગ્રી: {n_deg:.2f}°)\n"
-                           f"નિર્ગમન સમય: {exit_t.strftime('%d %b, %H:%M')}")
+                    # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
+                    msg = (f"<b>🌟 નવતારા એડવાન્સ એલર્ટ : {p_name}</b>\n\n"
+                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n"
+                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
+                           f"• <b>વર્તમાન સ્થિતિ:</b> {rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(r_deg)})\n"
+                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {fut_n} (નક્ષત્ર ડિગ્રી: {format_dms(n_deg)})\n"
+                           f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara}</b>\n"
+                           f"• <b>નક્ષત્ર નામ:</b> {fut_n}\n"
+                           f"• <b>નક્ષત્ર પ્રવેશ:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
+                           f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
                     
                     if TELEGRAM_TOKEN:
                         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
