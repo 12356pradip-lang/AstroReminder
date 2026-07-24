@@ -1,5 +1,6 @@
 import os
 import time
+import math
 import yaml
 import requests
 import yfinance as yf
@@ -20,44 +21,46 @@ def load_config(config_path="config.yml"):
         return yaml.safe_load(f)
 
 # ----------------------------------------------------
-# 2. Telegram Alert Integration (Only High-Conviction)
+# 2. Telegram Alert Integration
 # ----------------------------------------------------
-def send_telegram_alert(df_output, csv_filename):
-    bot_token = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
-    chat_id = "478006282"
+def send_telegram_alert(df_output, csv_filename, config):
+    telegram_cfg = config.get('telegram', {})
+    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", telegram_cfg.get('bot_token'))
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", telegram_cfg.get('chat_id'))
 
-    # Strict Filter: Only Strong Buy Stocks for Telegram Summary
-    df_strong = df_output[df_output['Signal'].str.contains("STRONG BUY")].copy()
+    if not bot_token or not chat_id or bot_token == "YOUR_TELEGRAM_BOT_TOKEN":
+        print("\n⚠️ Telegram credentials invalid or missing in config.yml. Skipping alert.")
+        return
+
+    df_strong = df_output[df_output['Signal'].str.contains("STRONG BUY", na=False)].copy()
 
     msg = f"🌟 *TOP PRIORITY CREAM STOCKS*\n"
     msg += f"📅 {datetime.now().strftime('%d-%b-%Y | %I:%M %p')}\n"
     msg += "─────────────────────────\n\n"
 
     if not df_strong.empty:
-        # Sort by Raw Numerical Score & RSI
         for idx, row in df_strong.iterrows():
             msg += f"🔥 *{row['Symbol']}*\n"
-            msg += f"📊 Score: `{row['Total Score']}` | RSI: `{row['W-RSI']}`\n"
-            msg += f"📈 Pattern: `{row['EMA Pattern']}` | Vol Spike: `{row['Volume Spike']}`\n"
+            msg += f"📊 Score: `{row['Total Score']}` | CMP: `₹{row['CMP']}`\n"
+            msg += f"💎 Intrinsic Val: `₹{row['Intrinsic Value']}` ({row['Undervalued']})\n"
+            msg += f"📈 Pattern: `{row['EMA Pattern']}` | RSI: `{row['W-RSI']}`\n"
             msg += f"🎯 ROE: `{row['ROE (%)']}%` | D/E: `{row['D/E']}`\n"
             msg += "─────────────────────────\n"
     else:
         msg += "⚠️ *આજે કોઈ સ્ટોક એક્સ્ટ્રીમ-સ્ટ્રિક્ટ ક્રાઈટેરિયામાં મેચ થયો નથી.*\n"
         msg += "💡 (નકામા સિગ્નલથી બચવા માટે સિસ્ટમ શાંત રહી છે).\n\n"
 
-    msg += "\n📁 *આખી Nifty 200 ફાઈલ જોવા માટે નીચે આપેલી CSV ડાઉનલોડ કરો.*"
+    msg += "\n📁 *આખી સ્ક્રીનિંગ ફાઈલ જોવા માટે નીચે આપેલી CSV ડાઉનલોડ કરો.*"
 
     try:
-        # 1. Send Text Summary
         text_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
         requests.post(text_url, data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=10)
 
-        # 2. Send CSV File Document
         doc_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
         with open(csv_filename, 'rb') as f:
             requests.post(doc_url, data={"chat_id": chat_id}, files={"document": f}, timeout=15)
 
-        print("📱 High-Conviction Telegram Alert Sent!")
+        print("📱 Telegram Alert Sent Successfully!")
     except Exception as e:
         print(f"❌ Failed to send Telegram alert: {e}")
 
@@ -73,26 +76,25 @@ def analyze_weekly_ema_junction(df_weekly, config):
             "EMA_Status": "Data Deficit", 
             "Correction_Ended": "NO",
             "Weekly_RSI": 0.0,
-            "Volume_Spike": "NO"
+            "Volume_Spike": "NO",
+            "CMP": 0.0
         }
 
     df_weekly['EMA20'] = df_weekly['Close'].ewm(span=tc['ema_fast'], adjust=False).mean()
     df_weekly['EMA50'] = df_weekly['Close'].ewm(span=tc['ema_mid'], adjust=False).mean()
     df_weekly['EMA200'] = df_weekly['Close'].ewm(span=tc['ema_slow'], adjust=False).mean()
 
-    # RSI Calculation
     delta = df_weekly['Close'].diff()
     gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
     loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
-    rs = gain / loss
+    rs = gain / (loss + 1e-10)
     df_weekly['RSI'] = 100 - (100 / (1 + rs))
 
     latest = df_weekly.iloc[-1]
     prev = df_weekly.iloc[-2]
 
-    # Volume Filter
     avg_volume = df_weekly['Volume'].tail(20).mean()
-    vol_spike = "YES" if latest['Volume'] > avg_volume * 1.2 else "NO"
+    vol_spike = "YES" if latest['Volume'] > (avg_volume * 1.2) else "NO"
 
     ema_diff = abs(latest['EMA20'] - latest['EMA50']) / latest['EMA50']
     is_ema_junction = ema_diff <= tc['junction_threshold']
@@ -102,7 +104,6 @@ def analyze_weekly_ema_junction(df_weekly, config):
     ema200_bounce = (prev['Low'] <= prev['EMA200']) and (latest['Close'] > latest['EMA200'])
 
     is_correction_ended = above_all_emas and (is_ema_junction or ema_crossover or ema200_bounce)
-
     rsi_ok = tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']
 
     tech_score = 0
@@ -114,29 +115,41 @@ def analyze_weekly_ema_junction(df_weekly, config):
 
     return {
         "Tech_Score": tech_score,
-        "Weekly_RSI": round(latest['RSI'], 1),
+        "Weekly_RSI": round(float(latest['RSI']), 1),
         "EMA_Status": junction_desc,
         "Correction_Ended": "YES 🎯" if is_correction_ended else "NO ⏳",
-        "Volume_Spike": vol_spike
+        "Volume_Spike": vol_spike,
+        "CMP": round(float(latest['Close']), 2)
     }
 
 # ----------------------------------------------------
-# 4. Strict Fundamental & Balance Sheet Check
+# 4. Fundamental, Balance Sheet & Intrinsic Value Check
 # ----------------------------------------------------
-def analyze_fundamentals(stock_obj, config):
+def analyze_fundamentals(stock_obj, cmp, config):
     fc = config['fundamental_criteria']
     
     try:
         info = stock_obj.info or {}
         balance_sheet = stock_obj.balance_sheet
     except Exception:
-        return {"Fund_Score": 0, "ROE (%)": 0, "D/E": 0, "FA_Increasing": "NO"}
+        return {"Fund_Score": 0, "ROE (%)": 0, "D/E": 0, "FA_Increasing": "NO", "Intrinsic_Value": 0.0, "Undervalued": "NO"}
 
     roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') is not None else 0
     debt_equity = info.get('debtToEquity', 0) / 100 if info.get('debtToEquity') is not None else 0
     promoter = info.get('heldPercentInsiders', 0) * 100 if info.get('heldPercentInsiders') is not None else 0
     earnings_growth = info.get('earningsGrowth', 0) * 100 if info.get('earningsGrowth') is not None else 0
     rev_growth = info.get('revenueGrowth', 0) * 100 if info.get('revenueGrowth') is not None else 0
+
+    # Intrinsic Value Calculation (Benjamin Graham's Formula)
+    eps = info.get('trailingEps', 0)
+    bvps = info.get('bookValue', 0)
+    
+    intrinsic_value = 0.0
+    is_undervalued = False
+    if eps > 0 and bvps > 0:
+        intrinsic_value = round(math.sqrt(22.5 * eps * bvps), 2)
+        if cmp > 0 and cmp <= intrinsic_value:
+            is_undervalued = True
 
     fa_increasing = False
     possible_fa_keys = ['Net Tangible Assets', 'Gross Property Plant Equipment', 'Properties', 'Total Non Current Assets']
@@ -159,7 +172,8 @@ def analyze_fundamentals(stock_obj, config):
         "PromoterHold": promoter >= fc['min_promoter'],
         "RevGrowth": rev_growth >= fc['min_rev_growth'],
         "ProfitGrowth": earnings_growth >= fc['min_profit_growth'],
-        "FA_Growth": fa_increasing if fc['require_fa_growth'] else True
+        "FA_Growth": fa_increasing if fc['require_fa_growth'] else True,
+        "Valuation": is_undervalued if fc.get('require_fair_valuation', False) else True
     }
 
     fund_score = sum(f_checks.values())
@@ -168,24 +182,21 @@ def analyze_fundamentals(stock_obj, config):
         "Fund_Score": fund_score,
         "ROE (%)": round(roe, 1),
         "D/E": round(debt_equity, 2),
-        "FA_Increasing": "YES" if fa_increasing else "NO"
+        "FA_Increasing": "YES" if fa_increasing else "NO",
+        "Intrinsic_Value": intrinsic_value,
+        "Undervalued": "YES 💎" if is_undervalued else "NO"
     }
 
 # ----------------------------------------------------
-# 5. Safe History Fetcher (With Fallback mechanism)
+# 5. Safe History Fetcher
 # ----------------------------------------------------
 def fetch_safe_history(stock_obj, config):
-    """
-    અહીં 5y/રિક્વેસ્ટ કરેલો પિરિયડ ના મળે તો ઓટોમેટિક fallback ટ્રાય કરશે,
-    જેથી Yahoo 404 Error ન આપે.
-    """
     req_period = config['data_settings']['period']
     req_interval = config['data_settings']['interval']
     
     try:
         df = stock_obj.history(period=req_period, interval=req_interval)
         if df is None or df.empty:
-            # Fallback to max data if requested period (e.g. 5y) fails for new stocks like ZOMATO
             df = stock_obj.history(period="max", interval=req_interval)
         return df
     except Exception:
@@ -196,14 +207,14 @@ def fetch_safe_history(stock_obj, config):
 # ----------------------------------------------------
 def run_screener():
     print("=" * 80)
-    print(f"🚀 ULTRA-CREAM NIFTY 200 SCREENER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"🚀 ULTRA-CREAM STOCK SCREENER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 80)
 
     config = load_config("config.yml")
     symbols = config.get("watchlist", [])
     
     if not symbols:
-        print("❌ Error: No stock symbols found.")
+        print("❌ Error: No stock symbols found in config watchlist.")
         return
 
     final_reports = []
@@ -215,21 +226,20 @@ def run_screener():
         try:
             stock = yf.Ticker(symbol)
             
-            # Safe history fetch to avoid 404 Errors
             df_weekly = fetch_safe_history(stock, config)
-            
             if df_weekly.empty:
                 continue
 
             tech_res = analyze_weekly_ema_junction(df_weekly, config)
-            fund_res = analyze_fundamentals(stock, config)
+            cmp = tech_res.get('CMP', 0.0)
+            
+            fund_res = analyze_fundamentals(stock, cmp, config)
 
             raw_total_score = tech_res.get('Tech_Score', 0) + fund_res.get('Fund_Score', 0)
             
-            pass_mark = config['scoring_rules']['min_score_pass'] # 8
-            watch_mark = config['scoring_rules']['watch_score_pass'] # 7
+            pass_mark = config['scoring_rules']['min_score_pass']   
+            watch_mark = config['scoring_rules']['watch_score_pass'] 
 
-            # Ultra-Strict Buy Criteria
             if raw_total_score >= pass_mark and tech_res.get('Correction_Ended') == "YES 🎯":
                 decision = "🟢 STRONG BUY"
             elif raw_total_score >= watch_mark:
@@ -241,9 +251,12 @@ def run_screener():
                 "Symbol": symbol,
                 "Signal": decision,
                 "RawScore": raw_total_score,
-                "Total Score": f"{raw_total_score}/9",
+                "Total Score": f"{raw_total_score}/10",
+                "CMP": cmp,
+                "Intrinsic Value": fund_res.get('Intrinsic_Value', 0.0),
+                "Undervalued": fund_res.get('Undervalued', 'NO'),
                 "Tech Score": f"{tech_res.get('Tech_Score', 0)}/3",
-                "Fund Score": f"{fund_res.get('Fund_Score', 0)}/6",
+                "Fund Score": f"{fund_res.get('Fund_Score', 0)}/7",
                 "Correction End?": tech_res.get('Correction_Ended', 'N/A'),
                 "EMA Pattern": tech_res.get('EMA_Status', 'N/A'),
                 "Volume Spike": tech_res.get('Volume_Spike', 'NO'),
@@ -257,25 +270,22 @@ def run_screener():
         except Exception as e:
             continue
         finally:
-            # 💡 Yahoo Finance Rate Limiting બચવા માટે ૧ સેકન્ડ પોઝ (ખૂબ જરૂરી)
-            time.sleep(1.0)
+            time.sleep(0.2)
 
     print("\n\n✅ Scanning Completed Successfully!\n")
     
     df_output = pd.DataFrame(final_reports)
     
     if df_output.empty:
-        print("⚠️ No data processed.")
+        print("⚠️ No valid data processed.")
         return
 
-    # Sort Output by RawScore Highest to Lowest
     df_output = df_output.sort_values(by="RawScore", ascending=False).drop(columns=["RawScore"])
 
     output_filename = "nifty200_screening_results.csv"
     df_output.to_csv(output_filename, index=False)
     
-    # Send High-Conviction Summary to Telegram
-    send_telegram_alert(df_output, output_filename)
+    send_telegram_alert(df_output, output_filename, config)
 
 if __name__ == "__main__":
     run_screener()
