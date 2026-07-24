@@ -1,32 +1,38 @@
-# Strict Trading System Configuration for Nifty 200
+# 1. Telegram Details (કૃપા કરીને તમારો Token અને Chat ID અહીં મુકો)
+telegram:
+  bot_token: "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
+  chat_id: "478006282"
 
+# 2. Historical Data Settings
 data_settings:
-  period: "5y"           # 5-Year data for Stable Weekly EMA 200 & Fixed Assets
-  interval: "1wk"        # Weekly chart for Correction End detection
+  period: "max"        # 5 વર્ષથી વધારીને max (તમામ ઉપલબ્ધ ડેટા) કરેલ છે
+  interval: "1wk"
 
+# 3. Technical Parameters
 technical_criteria:
-  ema_fast: 20           # Fast EMA
-  ema_mid: 50            # Mid EMA
-  ema_slow: 200          # Major Support EMA
-  junction_threshold: 0.025 # Strict 2.5% limit for EMA Squeeze / Junction
-  rsi_min: 55.0          # Strong Bullish Weekly RSI (Increased from 45)
-  rsi_max: 60.0
+  ema_fast: 20
+  ema_mid: 50
+  ema_slow: 200
+  junction_threshold: 0.03
+  rsi_min: 40
+  rsi_max: 70
 
+# 4. Fundamental & Valuation Criteria
 fundamental_criteria:
-  min_roe: 18.0          # Strict Min Return on Equity (Increased to 18%)
-  max_debt_equity: 0.3   # Low Debt limit (Reduced to 0.3)
-  min_promoter: 50.0     # Min Promoter Holding (%)
-  min_rev_growth: 10.0   # Min Revenue Growth (%)
-  min_profit_growth: 12.0 # Min Profit Growth (%)
-  require_fa_growth: true # Fixed Assets Growth mandatory
-  # 🚀 Future Growth Capital Expansion Filters:
-  min_cwip_ratio: 0.10          # Min 10% Capital Blocked in CWIP for Expansion
-  min_asset_expansion: 12.0     # Min 12% Growth in Fixed Assets / Gross Block
+  min_roe: 15.0
+  max_debt_equity: 1.0
+  min_promoter: 45.0
+  min_rev_growth: 10.0
+  min_profit_growth: 10.0
+  require_fa_growth: true
+  require_fair_valuation: true   # Intrinsic Value થી સસ્તો સ્ટોક ચેક કરશે
 
+# 5. Score Pass Logic
 scoring_rules:
-  min_score_pass: 8      # Extreme Strict: Min Score 8/9 for Strong Buy!
-  watch_score_pass: 7    # Score 7 for Watchlist
+  min_score_pass: 9             # Intrinsic Value ઉમેરાતા કૂલ સ્કોર 10 માંથી ગણાશે
+  watch_score_pass: 7
 
+# 6. Stocks Watchlist
 watchlist:
   - "3MINDIA.NS"
   - "ABB.NS"
