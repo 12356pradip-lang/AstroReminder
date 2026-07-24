@@ -155,16 +155,16 @@ def run_tracker():
                 if not is_alert_sent(alert_id):
                     if entry_time > now and entry_time < (now + timedelta(hours=24)):
                         # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (કુલ નિરયણ ડિગ્રી અને સ્પષ્ટ પુષ્કર પ્રવેશ સાથે)
-                        msg = (f"🌟 પુષ્કર નવમાંશ એડવાન્સ એલર્ટ: {name}\n"
-                               f"આગામી સમયમાં {name} 👉 **{entry['nakshatra']} - {entry['pada']} પદ** (પુષ્કર નવમાંશ) માં પ્રવેશ કરશે.\n"
-                               f"--------------------------------------------------\n"
-                               f"કુલ નિરયણ ડિગ્રી        : {total_deg:.2f}° ({format_dms(total_deg)})\n"
-                               f"વર્તમાન સ્થિતિ: {c_rasi} રાશિ (રાશિ ડિગ્રી: {c_rd:.2f}°)\n"
-                               f"નક્ષત્ર સ્થિતિ: {entry['nakshatra']} - {entry['pada']} (નક્ષત્ર ડિગ્રી: {n_deg:.2f}°)\n"
-                               f"નાવંશ રાશિ: {entry['navansh_rashi']} | પ્રધાન તત્વ: {entry['pradhan']}\n"
-                               f"મૂળ તત્વ: {entry['mul_tatva']} | નાવંશ તત્વ: {entry['nav_tatva']}\n"
-                               f"પ્રવેશ સમય: {entry_time.strftime('%d %b, %H:%M')}\n"
-                               f"નિર્ગમન સમય: {exit_time.strftime('%d %b, %H:%M')}")
+                        msg = (f"<b>🌟 પુષ્કર નવાંશ એલર્ટ : {name}</b>\n\n"
+                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
+                               f"• <b>વર્તમાન સ્થિતિ:</b> {c_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(c_rd)})\n"
+                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {entry['nakshatra']} - {entry['pada']} (નક્ષત્ર ડિગ્રી: {format_dms(n_deg)})\n"
+                               f"• <b>ભવિષ્યનું નક્ષત્ર:</b> <b>{entry['nakshatra']}</b>\n"
+                               f"• <b>પુષ્કર નક્ષત્ર ભાગ:</b> {entry['nakshatra']} - {entry['pada']}\n"
+                               f"• <b>નક્ષત્ર પદ પ્રવેશ:</b> {entry_time.strftime('%d %b, %H:%M')}\n"
+                               f"• <b>નિર્ગમન સમય:</b> {exit_time.strftime('%d %b, %H:%M')}\n"
+                               f"• <b>નક્ષત્ર નવાંશ રાશિ:</b> {entry['navansh_rashi']}  |  <b>નક્ષત્ર મૂળ તત્વ:</b> {entry['mul_tatva']}\n"
+                               f"• <b>નવાંશ તત્વ:</b> {entry['nav_tatva']}  |  <b>પ્રધાન તત્વ:</b> {entry['pradhan']}")
                         
                         print(f"\n{msg}\n")
                         msg_encoded = urllib.parse.quote(msg)
