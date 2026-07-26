@@ -37,7 +37,7 @@ def get_astro_position(planet_id, target_time):
     jd = swe.julday(target_utc.year, target_utc.month, target_utc.day, 
                     target_utc.hour + target_utc.minute/60.0 + target_utc.second/3600.0)
     
-    # ૩. ટોપોસેન્ટ્રિક લોકેશન અને ફ્લેગ્સ
+    # ૩. ટોપોસેન્ટ્રિક લોકેશન અને ફ્લેગ્સ (રિયલ-ટાઇમ સચોટ ગણતરી માટે)
     swe.set_topo(LON, LAT, 0)
     flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
     
@@ -50,8 +50,8 @@ def get_astro_position(planet_id, target_time):
     rasi_name = rashis[rasi_idx]
     rasi_deg = total_deg % 30
     
-    # ૫. નક્ષત્ર અને ચરણ ગણતરી
-    nak_span = 360.0 / 27.0  # 13.333333333333334
+    # ૫. નક્ષત્ર અને ચરણ ગણતરી (રિયલ-ટાઇમ સચોટ)
+    nak_span = 360.0 / 27.0  
     nak_idx = int(total_deg // nak_span) % 27
     nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
     nak_name = nakshatras[nak_idx]
@@ -65,7 +65,7 @@ def get_astro_position(planet_id, target_time):
 def get_fine_times(planet_id, target_nak):
     now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
     
-    if planet_id == 0:  # સૂર્ય માટે (લાંબો સમય નક્ષત્રમાં રહે છે)
+    if planet_id == 0:  # સૂર્ય માટે
         start_search = now - timedelta(days=15)
         entry = None
         entry_data = None
@@ -88,7 +88,7 @@ def get_fine_times(planet_id, target_nak):
             t_exit += timedelta(hours=1)
         return entry, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
 
-    else:  # ચંદ્ર માટે (ઝડપી ભ્રમણ - 30 કલાકની પરફેક્ટ લિમિટ)
+    else:  # ચંદ્ર માટે
         start = now - timedelta(days=2)
         entry = None
         entry_data = None
@@ -161,19 +161,21 @@ def run_tracker():
                 entry_t, exit_t, rasi, r_deg, pada, n_deg, total_deg = get_fine_times(p_id, fut_n)
                 
                 if entry_t and exit_t:
-                    # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
+                    # સુધારો: એક્ઝેક્ટ એન્ટ્રી ટાઇમ (entry_t) ની લાઈવ ડિગ્રીઓ ફરીથી ચોકસાઈપૂર્વક મેળવી લીધી છે
+                    live_rasi, live_r_deg, live_nak, live_pada, live_n_deg, live_total_deg = get_astro_position(p_id, entry_t)
+
+                    # ક્લીન અને પરફેક્ટ પ્રિન્ટ આઉટપુટ ફોર્મેટ (લાઈવ ડિગ્રીઓ સાથે)
                     msg = (f"<b>🌟 નવતારા એડવાન્સ એલર્ટ : {p_name}</b>\n\n"
-                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n"
-                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
-                           f"• <b>વર્તમાન સ્થિતિ:</b> {rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(r_deg)})\n"
-                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {fut_n} (નક્ષત્ર ડિગ્રી: {format_dms(n_deg)})\n"
+                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n\n"
+                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {live_total_deg:.2f}° ({format_dms(live_total_deg)})\n"
+                           f"• <b>વર્તમાન સ્થિતિ:</b> {live_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(live_r_deg)})\n"
+                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {live_nak} (નક્ષત્ર ડિગ્રી: {format_dms(live_n_deg)})\n"
                            f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara}</b>\n"
-                           f"• <b>નક્ષત્ર નામ:</b> {fut_n}\n"
                            f"• <b>નક્ષત્ર પ્રવેશ:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
                            f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
-                    
+                
                     if TELEGRAM_TOKEN:
-                        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
+                        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
                         requests.get(url)
                     
                     create_calendar_event(f"નવતારા: {tara}", msg)
