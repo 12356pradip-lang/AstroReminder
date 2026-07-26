@@ -89,7 +89,6 @@ def get_fine_times(planet_id, target_nak):
         entry = None
         entry_data = None
         
-        # એન્ટ્રી શોધવા માટે પાછલા કે આજથી મિનિટ-વાઈઝ ચેક કરો
         for i in range(0, 72 * 60):  
             t_check = start + timedelta(minutes=i)
             rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_check)
@@ -99,7 +98,6 @@ def get_fine_times(planet_id, target_nak):
                 break
                 
         if entry:
-            # ચંદ્ર વધુમાં વધુ 30 કલાક જ એક નક્ષત્રમાં રહે, તેથી લૂપ માત્ર 30 કલાક (1800 મિનિટ) ની જ રાખવી
             for k in range(1, 30 * 60):
                 t_exit = entry + timedelta(minutes=k)
                 rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_exit)
@@ -135,18 +133,21 @@ def run_tracker():
                 entry_t, exit_t, rasi, r_deg, pada, n_deg, total_deg = get_fine_times(p_id, fut_n)
                 
                 if entry_t and exit_t:
-                    # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
+                    # એન્ટ્રી ટાઇમની એકદમ લાઈવ અને સચોટ ડિગ્રીઓ મેળવવા માટે
+                    live_rasi, live_r_deg, live_nak, live_pada, live_n_deg, live_total_deg = get_astro_position(p_id, entry_t)
+
+                    # સુધારેલું અને પ્રોફેશનલ પ્રિન્ટ આઉટપુટ ફોર્મેટ (ડુપ્લિકેટ લાઈન દૂર કરી છે)
                     msg = (f"<b>🌟 નવતારા એડવાન્સ એલર્ટ : {p_name}</b>\n\n"
-                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n"
-                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
-                           f"• <b>વર્તમાન સ્થિતિ:</b> {rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(r_deg)})\n"
-                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {fut_n} (નક્ષત્ર ડિગ્રી: {format_dms(n_deg)})\n"
+                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n\n"
+                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {live_total_deg:.2f}° ({format_dms(live_total_deg)})\n"
+                           f"• <b>વર્તમાન સ્થિતિ:</b> {live_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(live_r_deg)})\n"
+                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {live_nak} (નક્ષત્ર ડિગ્રી: {format_dms(live_n_deg)})\n"
                            f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara}</b>\n"
-                           f"• <b>નક્ષત્ર નામ:</b> {fut_n}\n"
                            f"• <b>નક્ષત્ર પ્રવેશ:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
                            f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
-                    
-                    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}"
+                
+                    # સુધારો: &parse_mode=HTML ઉમેર્યું જેથી ટેગ્સ બરાબર બોલ્ડ દેખાય
+                    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
                     requests.get(url)
                     mark_alert_sent(alert_id)
                     print(f"✅ એલર્ટ મોકલાયું: {alert_id}")
