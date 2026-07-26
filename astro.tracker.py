@@ -142,7 +142,6 @@ def run_tracker():
     for p_id in [0, 1]:
         name = "સૂર્ય (Sun)" if p_id == 0 else "ચંદ્ર (Moon)"
         now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-        c_rasi, c_rd, c_nak, c_pada, c_nd, c_td = get_astro_position(p_id, now)
         
         for entry in PUSHKAR_DATA:
             entry_time, exit_time, rasi, r_deg, pada, n_deg, total_deg = get_fine_transition(p_id, entry)
@@ -154,11 +153,14 @@ def run_tracker():
                 
                 if not is_alert_sent(alert_id):
                     if entry_time > now and entry_time < (now + timedelta(hours=24)):
-                        # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (કુલ નિરયણ ડિગ્રી અને સ્પષ્ટ પુષ્કર પ્રવેશ સાથે)
+                        # એન્ટ્રી ટાઇમની એકદમ લાઈવ અને સચોટ ડિગ્રીઓ મેળવવા માટે
+                        live_rasi, live_rd, live_nak, live_pada, live_nd, live_td = get_astro_position(p_id, entry_time)
+
+                        # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (લાઈવ ડિગ્રીઓ અને parse_mode=HTML સાથે)
                         msg = (f"<b>🌟 પુષ્કર નવાંશ એલર્ટ : {name}</b>\n\n"
-                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
-                               f"• <b>વર્તમાન સ્થિતિ:</b> {c_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(c_rd)})\n"
-                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {entry['nakshatra']} - {entry['pada']} (નક્ષત્ર ડિગ્રી: {format_dms(n_deg)})\n"
+                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {live_td:.2f}° ({format_dms(live_td)})\n"
+                               f"• <b>વર્તમાન સ્થિતિ:</b> {live_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(live_rd)})\n"
+                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {entry['nakshatra']} - {entry['pada']} (નક્ષત્ર ડિગ્રી: {format_dms(live_nd)})\n"
                                f"• <b>ભવિષ્યનું નક્ષત્ર:</b> <b>{entry['nakshatra']}</b>\n"
                                f"• <b>પુષ્કર નક્ષત્ર ભાગ:</b> {entry['nakshatra']} - {entry['pada']}\n"
                                f"• <b>નક્ષત્ર પદ પ્રવેશ:</b> {entry_time.strftime('%d %b, %H:%M')}\n"
@@ -167,9 +169,10 @@ def run_tracker():
                                f"• <b>નવાંશ તત્વ:</b> {entry['nav_tatva']}  |  <b>પ્રધાન તત્વ:</b> {entry['pradhan']}")
                         
                         print(f"\n{msg}\n")
-                        msg_encoded = urllib.parse.quote(msg)
                         if TELEGRAM_TOKEN:
-                            requests.get(f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={msg_encoded}")
+                            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
+                            requests.get(url)
+                            
                         create_calendar_event(f"પુષ્કર: {name}", msg)
                         mark_alert_sent(alert_id)
                         break
