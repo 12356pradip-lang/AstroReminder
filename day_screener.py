@@ -93,6 +93,7 @@ def analyze_stock(ticker_symbol, config):
         df['RSI'] = calculate_rsi(df['Close'], period=14)
         
         latest = df.iloc[-1]
+        prev = df.iloc[-2]
         close_price = latest['Close']
         score = 0
         reasons = []
@@ -109,9 +110,8 @@ def analyze_stock(ticker_symbol, config):
             score += 1
             reasons.append("Daily EMA Junction")
             
-        # 3. 3-Day EMA 4 Doji Reversal Breakout Logic
+        # 3. 3-Day EMA 4 Doji Reversal Breakout
         doji_breakout_found = False
-        # Look back over the last 3 trading days for a Doji at EMA 4
         for i in range(1, 4):
             if len(df) <= i:
                 break
@@ -119,10 +119,8 @@ def analyze_stock(ticker_symbol, config):
             body_size = abs(candle['Close'] - candle['Open'])
             total_range = candle['High'] - candle['Low']
             
-            # Check if candle is a Doji at EMA 4
             if total_range > 0 and (body_size / total_range) <= tc['doji_body_ratio']:
                 if candle['Low'] <= candle['EMA_4'] and candle['Close'] >= candle['EMA_4']:
-                    # Reversal Confirmation: Current close must break above this Doji's High
                     if close_price > candle['High']:
                         doji_breakout_found = True
                         break
@@ -131,10 +129,10 @@ def analyze_stock(ticker_symbol, config):
             score += 1
             reasons.append("3-Day EMA 4 Doji Breakout")
                 
-        # 4. Strict Daily RSI Zone (55-58)
-        if tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']:
+        # 4. Fresh Daily RSI 60 Cross (Previous RSI < 60 AND Current RSI between 60 and 65)
+        if prev['RSI'] < 60.0 and (60.0 <= latest['RSI'] <= 65.0):
             score += 1
-            reasons.append(f"Strict Daily RSI ({latest['RSI']:.1f})")
+            reasons.append(f"Fresh RSI 60 Crossover ({latest['RSI']:.1f})")
             
         # 5. Fibonacci Support Zone (252 Trading Days High/Low)
         high_52 = df['High'].tail(252).max()

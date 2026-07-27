@@ -22,8 +22,8 @@ technical_criteria:
   ema_55: 55
   ema_200: 200
   junction_threshold: 0.025   # 2.5% Spread Range for Junction
-  rsi_min: 55.0               # Strict Ideal RSI Start Range
-  rsi_max: 58.0               # Strict Ideal RSI End Range
+  rsi_min: 60.0               # Strict Ideal RSI Start Range
+  rsi_max: 65.0       # RSI ની મહત્તમ લિમિટ (65 થી વધી જશે તો ફ્રેશ બ્રેકઆઉટ નહીં ગણાય)
   fib_level: 0.618            # Fibonacci Golden Ratio Support
   fib_tolerance: 0.02         # 2% Tolerance zone around 61.8%
   
