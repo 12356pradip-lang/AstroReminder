@@ -137,15 +137,16 @@ def run_tracker():
                             if alert_id in f.read(): already_sent = True
                     
                     if not already_sent:
-                        live_rasi, live_rd, live_nak, live_pada, live_nd, live_td = get_astro_position(p_id, entry_t)
+                        # અત્યારની રિયલ-ટાઇમ (Current) સ્થિતિ મેળવવા માટે
+                        now_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+                        curr_rasi, curr_rd, curr_nak, curr_pada, curr_nd, curr_td = get_astro_position(p_id, now_time)
 
                         msg = (f"<b>🌟 કુંડલિની સાધના નક્ષત્ર - એડવાન્સ એલર્ટ : {name}</b>\n\n"
                                f"આગામી સમયમાં {name} <b>{target_nak}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n"
-                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {live_td:.2f}° ({format_dms(live_td)})\n"
-                               f"• <b>વર્તમાન સ્થિતિ:</b> {live_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(live_rd)})\n"
-                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {target_nak} (નક્ષત્ર ડિગ્રી: {format_dms(live_nd)})\n"
+                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_td:.2f}° ({format_dms(curr_td)})\n"
+                               f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(curr_rd)})\n"
+                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} (નક્ષત્ર ડિગ્રી: {format_dms(curr_nd)})\n"
                                f"• <b>ભવિષ્યનું નક્ષત્ર:</b> <b>{target_nak}</b>\n"
-                               f"• <b>નક્ષત્ર નામ:</b> {target_nak}\n"
                                f"• <b>નક્ષત્ર પ્રવેશ:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
                                f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
                     
