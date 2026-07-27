@@ -1,38 +1,54 @@
-# 1. Telegram Details (કૃપા કરીને તમારો Token અને Chat ID અહીં મુકો)
+# ==============================================================================
+# CONFIG.YML - Complete Production Configuration
+# Technical: 4 EMAs (4, 20, 55, 200) + EMA 4 Doji Reversal + Fib 61.8% + Strict RSI (55-58)
+# Fundamental: ROE, D/E, Promoter, Growth + CWIP Expansion Analysis
+# Scoring Criteria: Total 11 Marks Pass Pipeline
+# ==============================================================================
+
+# 1. Telegram Alert Credentials
 telegram:
   bot_token: "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
   chat_id: "478006282"
 
-# 2. Historical Data Settings
+# 2. Historical Data Fetch Settings
 data_settings:
-  period: "max"        # 5 વર્ષથી વધારીને max (તમામ ઉપલબ્ધ ડેટા) કરેલ છે
+  period: "max"
   interval: "1wk"
 
-# 3. Technical Parameters
+# 3. Technical Analysis Parameters
 technical_criteria:
-  ema_fast: 20
-  ema_mid: 50
-  ema_slow: 200
-  junction_threshold: 0.03
-  rsi_min: 40
-  rsi_max: 70
+  ema_4: 4
+  ema_20: 20
+  ema_55: 55
+  ema_200: 200
+  junction_threshold: 0.025   # 2.5% Spread Range for Junction
+  rsi_min: 55.0               # Strict Ideal RSI Start Range
+  rsi_max: 58.0               # Strict Ideal RSI End Range
+  fib_level: 0.618            # Fibonacci Golden Ratio Support
+  fib_tolerance: 0.02         # 2% Tolerance zone around 61.8%
+  
+  # EMA 4 Doji Reversal Parameters
+  doji_body_ratio: 0.25       # Candle Body should be <= 25% of total candle range
 
-# 4. Fundamental & Valuation Criteria
+# 4. Fundamental Criteria (Including CWIP Expansion Rules)
 fundamental_criteria:
-  min_roe: 15.0
-  max_debt_equity: 1.0
-  min_promoter: 45.0
-  min_rev_growth: 10.0
-  min_profit_growth: 10.0
-  require_fa_growth: true
-  require_fair_valuation: true   # Intrinsic Value થી સસ્તો સ્ટોક ચેક કરશે
+  min_roe: 15.0                # Minimum ROE %
+  max_debt_equity: 1.0        # Maximum Debt to Equity Ratio
+  min_promoter: 45.0          # Minimum Promoter Holding %
+  min_rev_growth: 10.0        # Minimum YoY Revenue Growth %
+  min_profit_growth: 10.0     # Minimum YoY Profit Growth %
+  
+  # CWIP (Capital Work-In-Progress) Capex Expansion Criteria
+  cwip_rule:
+    consistent_years: 3       # 3 consecutive years of YoY CWIP increase
+    min_cwip_ratio: 0.03      # CWIP must be at least 3% of Net Block
 
-# 5. Score Pass Logic
+# 5. Scoring & Decision Thresholds (Total 11 Marks)
 scoring_rules:
-  min_score_pass: 9             # Intrinsic Value ઉમેરાતા કૂલ સ્કોર 10 માંથી ગણાશે
-  watch_score_pass: 7
+  min_score_pass: 9           # Score >= 9 -> STRONG BUY Alert
+  watch_score_pass: 7         # Score 7 or 8 -> WATCHLIST Alert
 
-# 6. Stocks Watchlist
+# 6. Watchlist (Nifty Top Stocks & Growth Candidates)
 watchlist:
   - "3MINDIA.NS"
   - "ABB.NS"

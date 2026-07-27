@@ -1,291 +1,270 @@
 import os
-import time
-import math
 import yaml
 import requests
-import yfinance as yf
-import pandas as pd
 import numpy as np
-import warnings
-from datetime import datetime
+import pandas as pd
+import yfinance as yf
 
-warnings.filterwarnings('ignore')
-
-# ----------------------------------------------------
-# 1. Load YAML Configuration
-# ----------------------------------------------------
+# ------------------------------------------------------------------------------
+# 1. LOAD CONFIGURATION
+# ------------------------------------------------------------------------------
 def load_config(config_path="config.yml"):
-    if not os.path.exists(config_path):
-        raise FileNotFoundError(f"Configuration file '{config_path}' not found.")
-    with open(config_path, "r", encoding="utf-8") as f:
-        return yaml.safe_load(f)
+    with open(config_path, "r", encoding="utf-8") as file:
+        return yaml.safe_load(file)
 
-# ----------------------------------------------------
-# 2. Telegram Alert Integration
-# ----------------------------------------------------
-def send_telegram_alert(df_output, csv_filename, config):
-    telegram_cfg = config.get('telegram', {})
-    bot_token = os.getenv("TELEGRAM_BOT_TOKEN", telegram_cfg.get('bot_token'))
-    chat_id = os.getenv("TELEGRAM_CHAT_ID", telegram_cfg.get('chat_id'))
+config = load_config()
 
-    if not bot_token or not chat_id or bot_token == "YOUR_TELEGRAM_BOT_TOKEN":
-        print("\n⚠️ Telegram credentials invalid or missing in config.yml. Skipping alert.")
-        return
-
-    df_strong = df_output[df_output['Signal'].str.contains("STRONG BUY", na=False)].copy()
-
-    msg = f"🌟 *TOP PRIORITY CREAM STOCKS*\n"
-    msg += f"📅 {datetime.now().strftime('%d-%b-%Y | %I:%M %p')}\n"
-    msg += "─────────────────────────\n\n"
-
-    if not df_strong.empty:
-        for idx, row in df_strong.iterrows():
-            msg += f"🔥 *{row['Symbol']}*\n"
-            msg += f"📊 Score: `{row['Total Score']}` | CMP: `₹{row['CMP']}`\n"
-            msg += f"💎 Intrinsic Val: `₹{row['Intrinsic Value']}` ({row['Undervalued']})\n"
-            msg += f"📈 Pattern: `{row['EMA Pattern']}` | RSI: `{row['W-RSI']}`\n"
-            msg += f"🎯 ROE: `{row['ROE (%)']}%` | D/E: `{row['D/E']}`\n"
-            msg += "─────────────────────────\n"
-    else:
-        msg += "⚠️ *આજે કોઈ સ્ટોક એક્સ્ટ્રીમ-સ્ટ્રિક્ટ ક્રાઈટેરિયામાં મેચ થયો નથી.*\n"
-        msg += "💡 (નકામા સિગ્નલથી બચવા માટે સિસ્ટમ શાંત રહી છે).\n\n"
-
-    msg += "\n📁 *આખી સ્ક્રીનિંગ ફાઈલ જોવા માટે નીચે આપેલી CSV ડાઉનલોડ કરો.*"
-
+# ------------------------------------------------------------------------------
+# 2. TELEGRAM ALERT SYSTEM
+# ------------------------------------------------------------------------------
+def send_telegram_alert(message):
+    token = config['telegram']['bot_token']
+    chat_id = config['telegram']['chat_id']
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     try:
-        text_url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
-        requests.post(text_url, data={"chat_id": chat_id, "text": msg, "parse_mode": "Markdown"}, timeout=10)
-
-        doc_url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
-        with open(csv_filename, 'rb') as f:
-            requests.post(doc_url, data={"chat_id": chat_id}, files={"document": f}, timeout=15)
-
-        print("📱 Telegram Alert Sent Successfully!")
+        response = requests.post(url, json=payload, timeout=10)
+        return response.status_code == 200
     except Exception as e:
-        print(f"❌ Failed to send Telegram alert: {e}")
+        print(f"Error sending Telegram alert: {e}")
+        return False
 
-# ----------------------------------------------------
-# 3. Technical & Weekly EMA Junction + Volume
-# ----------------------------------------------------
-def analyze_weekly_ema_junction(df_weekly, config):
-    tc = config['technical_criteria']
-    
-    if df_weekly is None or df_weekly.empty or len(df_weekly) < tc['ema_slow']:
-        return {
-            "Tech_Score": 0, 
-            "EMA_Status": "Data Deficit", 
-            "Correction_Ended": "NO",
-            "Weekly_RSI": 0.0,
-            "Volume_Spike": "NO",
-            "CMP": 0.0
-        }
-
-    df_weekly['EMA20'] = df_weekly['Close'].ewm(span=tc['ema_fast'], adjust=False).mean()
-    df_weekly['EMA50'] = df_weekly['Close'].ewm(span=tc['ema_mid'], adjust=False).mean()
-    df_weekly['EMA200'] = df_weekly['Close'].ewm(span=tc['ema_slow'], adjust=False).mean()
-
-    delta = df_weekly['Close'].diff()
-    gain = (delta.where(delta > 0, 0)).ewm(alpha=1/14, adjust=False).mean()
-    loss = (-delta.where(delta < 0, 0)).ewm(alpha=1/14, adjust=False).mean()
-    rs = gain / (loss + 1e-10)
-    df_weekly['RSI'] = 100 - (100 / (1 + rs))
-
-    latest = df_weekly.iloc[-1]
-    prev = df_weekly.iloc[-2]
-
-    avg_volume = df_weekly['Volume'].tail(20).mean()
-    vol_spike = "YES" if latest['Volume'] > (avg_volume * 1.2) else "NO"
-
-    ema_diff = abs(latest['EMA20'] - latest['EMA50']) / latest['EMA50']
-    is_ema_junction = ema_diff <= tc['junction_threshold']
-
-    above_all_emas = (latest['Close'] > latest['EMA20']) and (latest['Close'] > latest['EMA50'])
-    ema_crossover = (prev['EMA20'] <= prev['EMA50']) and (latest['EMA20'] > latest['EMA50'])
-    ema200_bounce = (prev['Low'] <= prev['EMA200']) and (latest['Close'] > latest['EMA200'])
-
-    is_correction_ended = above_all_emas and (is_ema_junction or ema_crossover or ema200_bounce)
-    rsi_ok = tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']
-
-    tech_score = 0
-    if above_all_emas: tech_score += 1
-    if is_ema_junction or ema_crossover or ema200_bounce: tech_score += 1
-    if rsi_ok: tech_score += 1
-
-    junction_desc = "SQUEEZE" if is_ema_junction else ("CROSSOVER" if ema_crossover else "SUPPORT BOUNCE")
-
-    return {
-        "Tech_Score": tech_score,
-        "Weekly_RSI": round(float(latest['RSI']), 1),
-        "EMA_Status": junction_desc,
-        "Correction_Ended": "YES 🎯" if is_correction_ended else "NO ⏳",
-        "Volume_Spike": vol_spike,
-        "CMP": round(float(latest['Close']), 2)
-    }
-
-# ----------------------------------------------------
-# 4. Fundamental, Balance Sheet & Intrinsic Value Check
-# ----------------------------------------------------
-def analyze_fundamentals(stock_obj, cmp, config):
-    fc = config['fundamental_criteria']
-    
+# ------------------------------------------------------------------------------
+# 3. INTRINSIC VALUE CALCULATOR (Graham's Revised Formula)
+# ------------------------------------------------------------------------------
+def calculate_intrinsic_value(ticker_obj):
+    """
+    Graham's Revised Formula થી Intrinsic Value ની ગણતરી:
+    Intrinsic Value = sqrt(22.5 * EPS * Book Value Per Share)
+    """
     try:
-        info = stock_obj.info or {}
-        balance_sheet = stock_obj.balance_sheet
+        info = ticker_obj.info
+        eps = info.get('trailingEps', None)
+        book_value = info.get('bookValue', None)
+
+        if eps is not None and book_value is not None and eps > 0 and book_value > 0:
+            intrinsic_val = np.sqrt(22.5 * eps * book_value)
+            return round(intrinsic_val, 2)
+        else:
+            return "N/A"
     except Exception:
-        return {"Fund_Score": 0, "ROE (%)": 0, "D/E": 0, "FA_Increasing": "NO", "Intrinsic_Value": 0.0, "Undervalued": "NO"}
+        return "N/A"
 
-    roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') is not None else 0
-    debt_equity = info.get('debtToEquity', 0) / 100 if info.get('debtToEquity') is not None else 0
-    promoter = info.get('heldPercentInsiders', 0) * 100 if info.get('heldPercentInsiders') is not None else 0
-    earnings_growth = info.get('earningsGrowth', 0) * 100 if info.get('earningsGrowth') is not None else 0
-    rev_growth = info.get('revenueGrowth', 0) * 100 if info.get('revenueGrowth') is not None else 0
+# ------------------------------------------------------------------------------
+# 4. TECHNICAL INDICATORS & LOGIC
+# ------------------------------------------------------------------------------
+def calculate_rsi(series, period=14):
+    delta = series.diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss
+    return 100 - (100 / (1 + rs))
 
-    # Intrinsic Value Calculation (Benjamin Graham's Formula)
-    eps = info.get('trailingEps', 0)
-    bvps = info.get('bookValue', 0)
+def check_fibonacci_618(df, tolerance=0.02):
+    """52-Week High/Low પરથી 61.8% Fib Retracement Support Zone ચકાસે છે."""
+    if len(df) < 52:
+        return False, 0.0
     
-    intrinsic_value = 0.0
-    is_undervalued = False
-    if eps > 0 and bvps > 0:
-        intrinsic_value = round(math.sqrt(22.5 * eps * bvps), 2)
-        if cmp > 0 and cmp <= intrinsic_value:
-            is_undervalued = True
-
-    fa_increasing = False
-    possible_fa_keys = ['Net Tangible Assets', 'Gross Property Plant Equipment', 'Properties', 'Total Non Current Assets']
-    fa_series = None
-
-    if balance_sheet is not None and not balance_sheet.empty:
-        for key in possible_fa_keys:
-            if key in balance_sheet.index:
-                fa_series = balance_sheet.loc[key].dropna()
-                break
-
-    if fa_series is not None and len(fa_series) >= 2:
-        fa_history = fa_series.iloc[::-1]
-        if fa_history.iloc[-1] > fa_history.iloc[0]:
-            fa_increasing = True
-
-    f_checks = {
-        "ROE": roe >= fc['min_roe'],
-        "DebtToEquity": debt_equity <= fc['max_debt_equity'],
-        "PromoterHold": promoter >= fc['min_promoter'],
-        "RevGrowth": rev_growth >= fc['min_rev_growth'],
-        "ProfitGrowth": earnings_growth >= fc['min_profit_growth'],
-        "FA_Growth": fa_increasing if fc['require_fa_growth'] else True,
-        "Valuation": is_undervalued if fc.get('require_fair_valuation', False) else True
-    }
-
-    fund_score = sum(f_checks.values())
-
-    return {
-        "Fund_Score": fund_score,
-        "ROE (%)": round(roe, 1),
-        "D/E": round(debt_equity, 2),
-        "FA_Increasing": "YES" if fa_increasing else "NO",
-        "Intrinsic_Value": intrinsic_value,
-        "Undervalued": "YES 💎" if is_undervalued else "NO"
-    }
-
-# ----------------------------------------------------
-# 5. Safe History Fetcher
-# ----------------------------------------------------
-def fetch_safe_history(stock_obj, config):
-    req_period = config['data_settings']['period']
-    req_interval = config['data_settings']['interval']
+    recent_df = df.tail(52)
+    high_price = recent_df['High'].max()
+    low_price = recent_df['Low'].min()
     
-    try:
-        df = stock_obj.history(period=req_period, interval=req_interval)
-        if df is None or df.empty:
-            df = stock_obj.history(period="max", interval=req_interval)
-        return df
-    except Exception:
-        return pd.DataFrame()
-
-# ----------------------------------------------------
-# 6. Main Screener Execution
-# ----------------------------------------------------
-def run_screener():
-    print("=" * 80)
-    print(f"🚀 ULTRA-CREAM STOCK SCREENER | {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print("=" * 80)
-
-    config = load_config("config.yml")
-    symbols = config.get("watchlist", [])
+    # 61.8% Golden Ratio Calculation
+    fib_618 = high_price - (0.618 * (high_price - low_price))
+    latest_close = df.iloc[-1]['Close']
     
-    if not symbols:
-        print("❌ Error: No stock symbols found in config watchlist.")
-        return
+    lower_bound = fib_618 * (1 - tolerance)
+    upper_bound = fib_618 * (1 + tolerance)
+    
+    is_at_fib = lower_bound <= latest_close <= upper_bound
+    return is_at_fib, round(fib_618, 2)
 
-    final_reports = []
-    total_symbols = len(symbols)
-
-    for idx, symbol in enumerate(symbols, 1):
-        print(f"[{idx:03d}/{total_symbols:03d}] Scanning: {symbol:<15}", end="\r")
+def check_ema4_doji_reversal(df, doji_ratio=0.25):
+    """
+    EMA 4 પાસે Doji બન્યા બાદ Close < EMA_4 થાય અને પછી Reversal આપે તે ચકાસે છે.
+    """
+    if len(df) < 3:
+        return False, "Insufficient Data"
+    
+    latest = df.iloc[-1]
+    prev = df.iloc[-2]
+    
+    prev_range = prev['High'] - prev['Low']
+    prev_body = abs(prev['Close'] - prev['Open'])
+    
+    if prev_range == 0:
+        return False, "Invalid Range"
         
-        try:
-            stock = yf.Ticker(symbol)
-            
-            df_weekly = fetch_safe_history(stock, config)
-            if df_weekly.empty:
-                continue
-
-            tech_res = analyze_weekly_ema_junction(df_weekly, config)
-            cmp = tech_res.get('CMP', 0.0)
-            
-            fund_res = analyze_fundamentals(stock, cmp, config)
-
-            raw_total_score = tech_res.get('Tech_Score', 0) + fund_res.get('Fund_Score', 0)
-            
-            pass_mark = config['scoring_rules']['min_score_pass']   
-            watch_mark = config['scoring_rules']['watch_score_pass'] 
-
-            if raw_total_score >= pass_mark and tech_res.get('Correction_Ended') == "YES 🎯":
-                decision = "🟢 STRONG BUY"
-            elif raw_total_score >= watch_mark:
-                decision = "🟡 WATCHLIST"
-            else:
-                decision = "🔴 REJECT"
-
-            row = {
-                "Symbol": symbol,
-                "Signal": decision,
-                "RawScore": raw_total_score,
-                "Total Score": f"{raw_total_score}/10",
-                "CMP": cmp,
-                "Intrinsic Value": fund_res.get('Intrinsic_Value', 0.0),
-                "Undervalued": fund_res.get('Undervalued', 'NO'),
-                "Tech Score": f"{tech_res.get('Tech_Score', 0)}/3",
-                "Fund Score": f"{fund_res.get('Fund_Score', 0)}/7",
-                "Correction End?": tech_res.get('Correction_Ended', 'N/A'),
-                "EMA Pattern": tech_res.get('EMA_Status', 'N/A'),
-                "Volume Spike": tech_res.get('Volume_Spike', 'NO'),
-                "W-RSI": tech_res.get('Weekly_RSI', 'N/A'),
-                "ROE (%)": fund_res.get('ROE (%)', 'N/A'),
-                "D/E": fund_res.get('D/E', 'N/A'),
-                "FA Growth": fund_res.get('FA_Increasing', 'N/A')
-            }
-            final_reports.append(row)
-
-        except Exception as e:
-            continue
-        finally:
-            time.sleep(0.2)
-
-    print("\n\n✅ Scanning Completed Successfully!\n")
+    body_ratio = prev_body / prev_range
+    is_doji = body_ratio <= doji_ratio
     
-    df_output = pd.DataFrame(final_reports)
+    below_ema4 = prev['Close'] < prev['EMA_4']
+    is_reversal = (latest['Close'] > prev['High']) and (latest['Close'] > latest['EMA_4'])
     
-    if df_output.empty:
-        print("⚠️ No valid data processed.")
-        return
+    if is_doji and below_ema4 and is_reversal:
+        return True, f"Doji Reversal Confirmed (Body Ratio: {round(body_ratio*100, 1)}%)"
+        
+    return False, "No Pattern"
 
-    df_output = df_output.sort_values(by="RawScore", ascending=False).drop(columns=["RawScore"])
+# ------------------------------------------------------------------------------
+# 5. FUNDAMENTAL & CWIP ANALYSIS
+# ------------------------------------------------------------------------------
+def analyze_cwip_expansion(ticker_obj):
+    """3 વર્ષનો સતત CWIP YoY વધારો ચકાસે છે."""
+    try:
+        bs = ticker_obj.balance_sheet
+        if bs is None or bs.empty:
+            return False, 0.0
+            
+        cwip_keys = [k for k in bs.index if 'Capital Work In Progress' in str(k) or 'CWIP' in str(k)]
+        if not cwip_keys:
+            return False, 0.0
+            
+        cwip_data = bs.loc[cwip_keys[0]].dropna()
+        if len(cwip_data) < 3:
+            return False, 0.0
+            
+        cwip_t = cwip_data.iloc[0]
+        cwip_t1 = cwip_data.iloc[1]
+        cwip_t2 = cwip_data.iloc[2]
+        
+        is_consistently_growing = (cwip_t > cwip_t1) and (cwip_t1 > cwip_t2)
+        return is_consistently_growing, cwip_t
+    except Exception:
+        return False, 0.0
 
-    output_filename = "nifty200_screening_results.csv"
-    df_output.to_csv(output_filename, index=False)
-    
-    send_telegram_alert(df_output, output_filename, config)
+# ------------------------------------------------------------------------------
+# 6. MAIN SCREENING PIPELINE
+# ------------------------------------------------------------------------------
+def screen_stock(symbol):
+    try:
+        ticker = yf.Ticker(symbol)
+        df = ticker.history(period=config['data_settings']['period'], 
+                            interval=config['data_settings']['interval'])
+        
+        if len(df) < 200:
+            return None
 
+        # Technical Calculations
+        df['EMA_4'] = df['Close'].ewm(span=config['technical_criteria']['ema_4'], adjust=False).mean()
+        df['EMA_20'] = df['Close'].ewm(span=config['technical_criteria']['ema_20'], adjust=False).mean()
+        df['EMA_55'] = df['Close'].ewm(span=config['technical_criteria']['ema_55'], adjust=False).mean()
+        df['EMA_200'] = df['Close'].ewm(span=config['technical_criteria']['ema_200'], adjust=False).mean()
+        df['RSI'] = calculate_rsi(df['Close'])
+        
+        latest = df.iloc[-1]
+        score = 0
+        details = []
+
+        # Intrinsic Value Calculation
+        intrinsic_val = calculate_intrinsic_value(ticker)
+        iv_display = f"₹{intrinsic_val}" if isinstance(intrinsic_val, (int, float)) else "N/A"
+
+        # --- TECHNICAL TESTS (Max 5 Points) ---
+        # 1. EMA Alignment
+        if latest['EMA_4'] > latest['EMA_20'] > latest['EMA_55'] > latest['EMA_200']:
+            score += 1
+            details.append("EMA Alignment: PASS")
+            
+        # 2. Strict RSI (55 to 58)
+        if config['technical_criteria']['rsi_min'] <= latest['RSI'] <= config['technical_criteria']['rsi_max']:
+            score += 1
+            details.append(f"Strict RSI ({round(latest['RSI'], 2)}): PASS")
+            
+        # 3. EMA Junction (20, 55, 200)
+        max_ema = max(latest['EMA_20'], latest['EMA_55'], latest['EMA_200'])
+        min_ema = min(latest['EMA_20'], latest['EMA_55'], latest['EMA_200'])
+        if (max_ema - min_ema) / min_ema <= config['technical_criteria']['junction_threshold']:
+            score += 1
+            details.append("EMA Junction Compression: PASS")
+            
+        # 4. Fibonacci 61.8% Support Zone
+        is_fib, fib_val = check_fibonacci_618(df, tolerance=config['technical_criteria']['fib_tolerance'])
+        if is_fib:
+            score += 1
+            details.append(f"Fib 61.8% Support ({fib_val}): PASS")
+            
+        # 5. EMA 4 Doji Reversal
+        is_doji_rev, doji_msg = check_ema4_doji_reversal(
+            df, 
+            doji_ratio=config['technical_criteria']['doji_body_ratio']
+        )
+        if is_doji_rev:
+            score += 1
+            details.append(f"EMA4 Doji Reversal: PASS ({doji_msg})")
+
+        # --- FUNDAMENTAL TESTS (Max 6 Points) ---
+        info = ticker.info
+        roe = info.get('returnOnEquity', 0) * 100 if info.get('returnOnEquity') else 0
+        de = info.get('debtToEquity', 0) / 100 if info.get('debtToEquity') else 0
+        promoter = info.get('heldPercentInsiders', 0) * 100 if info.get('heldPercentInsiders') else 0
+        rev_growth = info.get('revenueGrowth', 0) * 100 if info.get('revenueGrowth') else 0
+        profit_growth = info.get('earningsGrowth', 0) * 100 if info.get('earningsGrowth') else 0
+
+        if roe >= config['fundamental_criteria']['min_roe']:
+            score += 1
+            details.append("ROE: PASS")
+        if de <= config['fundamental_criteria']['max_debt_equity']:
+            score += 1
+            details.append("Debt/Equity: PASS")
+        if promoter >= config['fundamental_criteria']['min_promoter']:
+            score += 1
+            details.append("Promoter Holding: PASS")
+        if rev_growth >= config['fundamental_criteria']['min_rev_growth']:
+            score += 1
+            details.append("Revenue Growth: PASS")
+        if profit_growth >= config['fundamental_criteria']['min_profit_growth']:
+            score += 1
+            details.append("Profit Growth: PASS")
+
+        # 6. CWIP Expansion Analysis
+        has_cwip_growth, cwip_val = analyze_cwip_expansion(ticker)
+        if has_cwip_growth:
+            score += 1
+            details.append("CWIP 3-Yr YoY Growth: PASS")
+
+        # --- CONSOLE PRINT & TELEGRAM NOTIFICATION ---
+        cmp = round(latest['Close'], 2)
+
+        if score >= config['scoring_rules']['min_score_pass']:
+            # Terminal Print Output
+            print(f"[{symbol}] Strong Buy Alert! Score: {score}/11 | CMP: ₹{cmp} | Intrinsic Val: {iv_display}")
+            
+            # Telegram Alert
+            msg = f"🔥 *STRONG BUY ALERT: {symbol}*\n\n" \
+                  f"📊 *Score:* {score}/11\n" \
+                  f"💰 *CMP:* ₹{cmp}\n" \
+                  f"💎 *Intrinsic Value:* {iv_display}\n" \
+                  f"📈 *RSI:* {round(latest['RSI'], 2)}\n\n" \
+                  f"*Matched Rules:*\n" + "\n".join([f"• {d}" for d in details])
+            send_telegram_alert(msg)
+
+        elif score >= config['scoring_rules']['watch_score_pass']:
+            # Terminal Print Output
+            print(f"[{symbol}] Watchlist Alert! Score: {score}/11 | CMP: ₹{cmp} | Intrinsic Val: {iv_display}")
+
+            # Telegram Alert
+            msg = f"👀 *WATCHLIST ALERT: {symbol}*\n\n" \
+                  f"📊 *Score:* {score}/11\n" \
+                  f"💰 *CMP:* ₹{cmp}\n" \
+                  f"💎 *Intrinsic Value:* {iv_display}\n\n" \
+                  f"*Matched Rules:*\n" + "\n".join([f"• {d}" for d in details])
+            send_telegram_alert(msg)
+
+        return {"Symbol": symbol, "Score": score, "CMP": cmp, "IntrinsicValue": iv_display}
+
+    except Exception as e:
+        print(f"Error processing {symbol}: {e}")
+        return None
+
+# ------------------------------------------------------------------------------
+# RUN SCREENER
+# ------------------------------------------------------------------------------
 if __name__ == "__main__":
-    run_screener()
+    print("🚀 Running Screener with Intrinsic Value & Complete 11-Mark Pipeline...\n")
+    results = []
+    for stock in config['watchlist']:
+        res = screen_stock(stock)
+        if res:
+            results.append(res)
+    print("\n✅ Screening Complete!")
