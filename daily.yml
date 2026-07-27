@@ -28,7 +28,7 @@ technical_criteria:
   fib_tolerance: 0.02         # 2% Tolerance zone around 61.8%
   
   # EMA 4 Doji Reversal Parameters
-  doji_body_ratio: 0.25       # Candle Body should be <= 25% of total candle range
+  #doji_body_ratio: 0.25       # Candle Body should be <= 25% of total candle range
 
 # 4. Fundamental Criteria (Including CWIP Expansion Rules)
 fundamental_criteria:
