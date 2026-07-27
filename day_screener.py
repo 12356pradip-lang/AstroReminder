@@ -74,7 +74,6 @@ def analyze_stock(ticker_symbol, config):
     try:
         stock = yf.Ticker(ticker_symbol)
         
-        # Read parameters directly from daily.yml (e.g. period: "max", interval: "1d")
         period = config['data_settings'].get('period', 'max')
         interval = config['data_settings'].get('interval', '1d')
         
@@ -110,20 +109,34 @@ def analyze_stock(ticker_symbol, config):
             score += 1
             reasons.append("Daily EMA Junction")
             
-        # 3. Daily Doji Reversal at EMA 4
-        body_size = abs(latest['Close'] - latest['Open'])
-        total_range = latest['High'] - latest['Low']
-        if total_range > 0 and (body_size / total_range) <= tc['doji_body_ratio']:
-            if latest['Low'] <= latest['EMA_4'] and latest['Close'] >= latest['EMA_4']:
-                score += 1
-                reasons.append("Daily EMA 4 Doji Reversal")
+        # 3. 3-Day EMA 4 Doji Reversal Breakout Logic
+        doji_breakout_found = False
+        # Look back over the last 3 trading days for a Doji at EMA 4
+        for i in range(1, 4):
+            if len(df) <= i:
+                break
+            candle = df.iloc[-i]
+            body_size = abs(candle['Close'] - candle['Open'])
+            total_range = candle['High'] - candle['Low']
+            
+            # Check if candle is a Doji at EMA 4
+            if total_range > 0 and (body_size / total_range) <= tc['doji_body_ratio']:
+                if candle['Low'] <= candle['EMA_4'] and candle['Close'] >= candle['EMA_4']:
+                    # Reversal Confirmation: Current close must break above this Doji's High
+                    if close_price > candle['High']:
+                        doji_breakout_found = True
+                        break
+
+        if doji_breakout_found:
+            score += 1
+            reasons.append("3-Day EMA 4 Doji Breakout")
                 
         # 4. Strict Daily RSI Zone (55-58)
         if tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']:
             score += 1
             reasons.append(f"Strict Daily RSI ({latest['RSI']:.1f})")
             
-        # 5. Fibonacci Support Zone (Calculated using 252 Trading Days High/Low)
+        # 5. Fibonacci Support Zone (252 Trading Days High/Low)
         high_52 = df['High'].tail(252).max()
         low_52 = df['Low'].tail(252).min()
         fib_618 = high_52 - (high_52 - low_52) * tc['fib_level']
