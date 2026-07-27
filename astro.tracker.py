@@ -153,16 +153,20 @@ def run_tracker():
                 
                 if not is_alert_sent(alert_id):
                     if entry_time > now and entry_time < (now + timedelta(hours=24)):
-                        # એન્ટ્રી ટાઇમની એકદમ લાઈવ અને સચોટ ડિગ્રીઓ મેળવવા માટે
+                        # ૧. અત્યારની રિયલ-ટાઇમ (Current) સ્થિતિ મેળવવા માટે
+                        curr_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+                        curr_rasi, curr_rd, curr_nak, curr_pada, curr_nd, curr_td = get_astro_position(p_id, curr_time)
+
+                        # ૨. એન્ટ્રી ટાઇમની ચોક્કસ ડિગ્રીઓ મેળવવા માટે
                         live_rasi, live_rd, live_nak, live_pada, live_nd, live_td = get_astro_position(p_id, entry_time)
 
-                        # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (લાઈવ ડિગ્રીઓ અને parse_mode=HTML સાથે)
+                        # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
                         msg = (f"<b>🌟 પુષ્કર નવાંશ એલર્ટ : {name}</b>\n\n"
-                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {live_td:.2f}° ({format_dms(live_td)})\n"
-                               f"• <b>વર્તમાન સ્થિતિ:</b> {live_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(live_rd)})\n"
-                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {entry['nakshatra']} - {entry['pada']} (નક્ષત્ર ડિગ્રી: {format_dms(live_nd)})\n"
+                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_td:.2f}° ({format_dms(curr_td)})\n"
+                               f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(curr_rd)})\n"
+                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} - {curr_pada} (નક્ષત્ર ડિગ્રી: {format_dms(curr_nd)})\n"
                                f"• <b>ભવિષ્યનું નક્ષત્ર:</b> <b>{entry['nakshatra']}</b>\n"
-                               f"• <b>પુષ્કર નક્ષત્ર ભાગ:</b> {entry['nakshatra']} - {entry['pada']}\n"
+                               f"• <b>પુષ્કર નક્ષત્ર ભાગ:</b> {entry['nakshatra']} - {entry['pada']} (ચરણ પ્રવેશ)\n"
                                f"• <b>નક્ષત્ર પદ પ્રવેશ:</b> {entry_time.strftime('%d %b, %H:%M')}\n"
                                f"• <b>નિર્ગમન સમય:</b> {exit_time.strftime('%d %b, %H:%M')}\n"
                                f"• <b>નક્ષત્ર નવાંશ રાશિ:</b> {entry['navansh_rashi']}  |  <b>નક્ષત્ર મૂળ તત્વ:</b> {entry['mul_tatva']}\n"
