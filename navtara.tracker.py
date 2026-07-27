@@ -167,13 +167,13 @@ def run_tracker():
 
                     # ક્લીન અને પરફેક્ટ પ્રિન્ટ આઉટપુટ ફોર્મેટ (લાઈવ ડિગ્રીઓ સાથે)
                     msg = (f"<b>🌟 નવતારા એડવાન્સ એલર્ટ : {p_name}</b>\n\n"
-                       f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n\n"
-                       f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_total_deg:.2f}° ({format_dms(curr_total_deg)})\n"
-                       f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(curr_r_deg)})\n"
-                       f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} (નક્ષત્ર ડિગ્રી: {format_dms(curr_n_deg)})\n"
-                       f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara} ({fut_n})</b>\n"
-                       f"• <b>નક્ષત્ર પ્રવેશ સમય:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
-                       f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
+                           f"આગામી ૧૨ કલાકમાં {p_name} <b>{fut_n}</b> નક્ષત્રમાં પ્રવેશ કરશે.\n\n"
+                           f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_total_deg:.2f}° ({format_dms(curr_total_deg)})\n"
+                           f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(curr_r_deg)})\n"
+                           f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} (નક્ષત્ર ડિગ્રી: {format_dms(curr_n_deg)})\n"
+                           f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara} ({fut_n})</b>\n"
+                           f"• <b>નક્ષત્ર પ્રવેશ સમય:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
+                           f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
                        
                     if TELEGRAM_TOKEN:
                         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
