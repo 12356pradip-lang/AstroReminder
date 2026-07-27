@@ -33,5 +33,7 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run Main Screener Script
-        run: python main_screener.py
-             python day_screener.py 
+        run: python main_screener.py || true
+
+      - name: Run Day Screener Script
+        run: python day_screener.py  
