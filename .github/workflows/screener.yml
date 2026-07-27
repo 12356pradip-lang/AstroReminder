@@ -9,7 +9,7 @@ on:
     - cron: '3 8 * * 1-5'
     
     # 3. IST બપોરે 03:00 PM (UTC 09:30 AM) -> રન થશે ~09:33 UTC
-    - cron: '33 9 * * 1-5'# IST સવારે 09:45 AM (UTC 04:15 AM)
+    - cron: '33 9 * * 1-5'
 
   # Manual Run Option from GitHub UI (બિલકુલ ડાબી બાજુથી શરૂ થવું જોઈએ)
   workflow_dispatch:
