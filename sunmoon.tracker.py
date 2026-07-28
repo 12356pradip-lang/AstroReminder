@@ -5,7 +5,7 @@ import os
 import urllib.parse
 
 # --- કોન્ફિગરેશન ---
-TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU" # તમારી જરૂરિયાત મુજબ બદલી શકો છો
+TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
 TELEGRAM_CHAT_ID = "478006282"
 LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "sun_moon_detail_history.txt"
@@ -22,13 +22,6 @@ def format_dms(deg):
     m = int((deg - d) * 60)
     s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
-
-def is_alert_sent(alert_id):
-    if not os.path.exists(HISTORY_FILE): return False
-    with open(HISTORY_FILE, "r") as f: return alert_id in f.read().splitlines()
-
-def mark_alert_sent(alert_id):
-    with open(HISTORY_FILE, "a") as f: f.write(alert_id + "\n")
 
 def get_astro_position(planet_id, target_time):
     swe.set_sid_mode(swe.SIDM_LAHIRI)
@@ -58,32 +51,22 @@ def get_astro_position(planet_id, target_time):
 
 def get_nakshatra_pada_times(planet_id, current_time, current_nak):
     """
-    વર્તમાન નક્ષત્રના ચારેય પાદ ક્યારે શરૂ થાય છે અને પૂરા થાય છે તેની સચોટ ગણતરી કરે છે.
+    વર્તમાન નક્ષત્રના ચારેય પદ ક્યારે શરૂ થાય છે અને પૂરા થાય છે તેની સચોટ ગણતરી કરે છે.
     """
-    nak_span = 360.0 / 27.0
-    pada_span = nak_span / 4.0
-    
-    # નક્ષત્રની શરુઆતનો ચોક્કસ સમય શોધવા માટે પાછળની તરફ સર્ચ કરીએ
     search_start = current_time - timedelta(days=15 if planet_id == 0 else 2)
     entry_time = None
     
     step_minutes = 60 if planet_id == 0 else 5
-    
-    # એન્ટ્રી ટાઇમ શોધીએ
     t_check = search_start
     end_limit = current_time + timedelta(days=15 if planet_id == 0 else 2)
     
-    # નક્ષત્રની એક્ઝેક્ટ એન્ટ્રી શોધીએ
-    prev_nak = None
     while t_check <= end_limit:
         _, _, nak, _, _, _, _ = get_astro_position(planet_id, t_check)
         if nak == current_nak:
             entry_time = t_check
-            # હજુ વધુ સચોટ મિનિટ માટે પાછળ જઈને બાઈનરી કે મિનિટ બેઝ્ડ ચેક કરીએ
             break
         t_check += timedelta(minutes=step_minutes)
 
-    # જો એન્ટ્રી ટાઈમ મળી ગયો તો એક્ઝેક્ટ મિનિટ શોધીએ
     if entry_time:
         fine_check = entry_time - timedelta(minutes=step_minutes)
         for m in range(0, step_minutes * 2 + 1):
@@ -93,7 +76,6 @@ def get_nakshatra_pada_times(planet_id, current_time, current_nak):
                 entry_time = t_f
                 break
 
-    # નિર્ગમન (Exit) સમય શોધીએ
     exit_time = entry_time
     if entry_time:
         t_exit = entry_time + timedelta(hours=1)
@@ -104,8 +86,7 @@ def get_nakshatra_pada_times(planet_id, current_time, current_nak):
                 break
             t_exit += timedelta(hours=1 if planet_id == 0 else 0.5)
 
-    # જો એન્ટ્રી અને એક્ઝિટ મળી જાય, તો ૪ પાદનો સમય સમાન અંતરે વહેંચાયેલ હોય છે
-    padas_schedule = []
+    pada_schedule = []
     if entry_time and exit_time:
         total_duration = exit_time - entry_time
         single_pada_duration = total_duration / 4.0
@@ -113,9 +94,9 @@ def get_nakshatra_pada_times(planet_id, current_time, current_nak):
         for i in range(4):
             p_start = entry_time + (single_pada_duration * i)
             p_end = entry_time + (single_pada_duration * (i + 1))
-            padas_schedule.append((i + 1, p_start, p_end))
+            pada_schedule.append((i + 1, p_start, p_end))
             
-    return padas_schedule
+    return pada_schedule
 
 def run_tracker():
     planets = {0: "સૂર્ય (Sun)", 1: "ચંદ્ર (Moon)"}
@@ -124,21 +105,21 @@ def run_tracker():
     for p_id, p_name in planets.items():
         rasi_name, rasi_deg, nak_name, current_pada, nak_deg, total_deg, jd = get_astro_position(p_id, now)
         
-        # પાદની ગણતરી મેળવીએ
+        # પદની ગણતરી મેળવીએ
         padas = get_nakshatra_pada_times(p_id, now, nak_name)
         
         padas_text = ""
         for p_num, p_start, p_end in padas:
             active_mark = " ◄ (ચાલુ)" if p_num == current_pada else ""
-            padas_text += f"  • પાદ {p_num}: {p_start.strftime('%d %b, %H:%M')} થી {p_end.strftime('%d %b, %H:%M')}{active_mark}\n"
+            padas_text += f"  • પદ {p_num}: {p_start.strftime('%d %b, %H:%M')} થી {p_end.strftime('%d %b, %H:%M')}{active_mark}\n"
 
         msg = (f"<b>🌟 એસ્ટ્રો લાઈવ ડીટે્લ્ડ રિપોર્ટ : {p_name}</b>\n\n"
                f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
                f"• <b>વર્તમાન સ્થિતિ:</b> {rasi_name} રાશિ (ડિગ્રી: {format_dms(rasi_deg)})\n"
-               f"• <b>નક્ષત્ર સ્થિતિ:</b> {nak_name} (પાદ {current_pada} | ડિગ્રી: {format_dms(nak_deg)})\n\n"
-               f"<b>📅 નક્ષત્રના ચારેય પાદની વિગત:</b>\n{padas_text}")
+               f"• <b>નક્ષત્ર સ્થિતિ:</b> {nak_name} (પદ {current_pada} | ડિગ્રી: {format_dms(nak_deg)})\n\n"
+               f"<b>📅 નક્ષત્રના ચારેય પદની વિગત:</b>\n{padas_text}")
 
-        print(f"\n{msg.replace('<b>','').replace('</b>','')}")
+        print(f"\n{msg.replace('<b>','').replace('<b>','').replace('</b>','')}")
 
         # ટેલિગ્રામ મોકલવા માટે
         if TELEGRAM_TOKEN:
