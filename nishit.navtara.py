@@ -68,7 +68,7 @@ def get_fine_times(planet_id, target_nak):
         entry_data = None
         for i in range(0, 15 * 24 + 48, 1):
             t_check = start_search + timedelta(hours=i)
-            rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_check)
+            rasi, r_deg, nak, pada, n_deg, t_deg, _ = get_astro_position(planet_id, t_check)
             if nak == target_nak:
                 entry = t_check
                 entry_data = (rasi, r_deg, pada, n_deg, t_deg)
@@ -79,7 +79,7 @@ def get_fine_times(planet_id, target_nak):
 
         t_exit = entry + timedelta(days=1)
         for _ in range(30 * 24):
-            rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_exit)
+            rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e, _ = get_astro_position(planet_id, t_exit)
             if nak_e != target_nak:
                 break
             t_exit += timedelta(hours=1)
@@ -92,7 +92,7 @@ def get_fine_times(planet_id, target_nak):
         
         for i in range(0, 72 * 60, 5):  
             t_check = start + timedelta(minutes=i)
-            rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_check)
+            rasi, r_deg, nak, pada, n_deg, t_deg, _ = get_astro_position(planet_id, t_check)
             if nak == target_nak:
                 entry = t_check
                 entry_data = (rasi, r_deg, pada, n_deg, t_deg)
@@ -103,7 +103,7 @@ def get_fine_times(planet_id, target_nak):
             fine_start = entry - timedelta(minutes=10)
             for m in range(0, 20):
                 t_f = fine_start + timedelta(minutes=m)
-                rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_f)
+                rasi, r_deg, nak, pada, n_deg, t_deg, _ = get_astro_position(planet_id, t_f)
                 if nak == target_nak:
                     entry = t_f
                     entry_data = (rasi, r_deg, pada, n_deg, t_deg)
@@ -112,7 +112,7 @@ def get_fine_times(planet_id, target_nak):
             t_exit = entry + timedelta(hours=1)
             for k in range(1, 30 * 60):
                 t_ex_check = entry + timedelta(minutes=k)
-                rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_ex_check)
+                rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e, _ = get_astro_position(planet_id, t_ex_check)
                 if nak_e != target_nak:
                     return entry, t_ex_check, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
                     
@@ -123,7 +123,7 @@ def run_tracker():
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
 
     for p_id, p_name in planets.items():
-        fut_rasi, fut_r_deg, fut_n, fut_pada, fut_n_deg, fut_t_deg = get_astro_position(p_id, future_time)
+        fut_rasi, fut_r_deg, fut_n, fut_pada, fut_n_deg, fut_t_deg, _ = get_astro_position(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
@@ -147,7 +147,7 @@ def run_tracker():
                 if entry_t and exit_t:
                     # અત્યારની રિયલ-ટાઇમ (Current) સ્થિતિ મેળવવા માટે
                     now_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
-                    curr_rasi, curr_r_deg, curr_nak, curr_pada, curr_n_deg, curr_total_deg = get_astro_position(p_id, now_time)
+                    curr_rasi, curr_r_deg, curr_nak, curr_pada, curr_n_deg, curr_total_deg, _ = get_astro_position(p_id, now_time)
 
                     # સુધારેલું અને પ્રોફેશનલ પ્રિન્ટ આઉટપુટ ફોર્મેટ (વર્તમાન રિયલ-ટાઇમ અને સુંદર ફોર્મેટ સાથે)
                     msg = (f"<b>🌟 નવતારા એડવાન્સ એલર્ટ : {p_name}</b>\n\n"
