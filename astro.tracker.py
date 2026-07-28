@@ -65,7 +65,7 @@ def get_astro_position(planet_id, target_time):
     rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
     
-    nak_span = 360.0 / 27.0  # 13.333333333333334
+    nak_span = 360.0 / 27.0  
     nak_idx = int(total_deg // nak_span) % 27
     nak_name = NAKSHATRAS[nak_idx]
     

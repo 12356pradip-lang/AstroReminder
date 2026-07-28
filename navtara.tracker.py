@@ -32,30 +32,22 @@ def format_dms(deg):
     return f"{d}°{m}'{s}\""
 
 def get_astro_position(planet_id, target_time):
-    # ૧. લાહિરી અયનાંશ સેટ કરો
     swe.set_sid_mode(swe.SIDM_LAHIRI)
-    
-    # ૨. UTC સમય કન્વર્ઝન
     target_utc = target_time - timedelta(hours=5, minutes=30)
     jd = swe.julday(target_utc.year, target_utc.month, target_utc.day, 
                     target_utc.hour + target_utc.minute/60.0 + target_utc.second/3600.0)
     
-    # ૩. ટોપોસેન્ટ્રિક લોકેશન અને ફ્લેગ્સ (રિયલ-ટાઇમ સચોટ ગણતરી માટે)
     swe.set_topo(LON, LAT, 0)
     flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
     
     res = swe.calc_ut(jd, planet_id, flags)
-    total_deg = res[0][0]  # કુલ નિરયણ ડિગ્રી (0 થી 360)
+    total_deg = res[0][0]
     
-    if planet_id == 1: total_deg = (total_deg - 2.9) % 360
-    
-    # ૪. રાશિ અને રાશિની ડિગ્રી ગણતરી
     rasi_idx = int(total_deg // 30) % 12
     rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
     
-    # ૫. નક્ષત્ર અને ચરણ ગણતરી (રિયલ-ટાઇમ સચોટ)
-    nak_span = 360.0 / 27.0  
+    nak_span = 360.0 / 27.0
     nak_idx = int(total_deg // nak_span) % 27
     nak_name = NAKSHATRAS[nak_idx]
     
@@ -63,7 +55,7 @@ def get_astro_position(planet_id, target_time):
     pada_span = nak_span / 4.0
     pada = int(nak_deg // pada_span) + 1
     
-    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg
+    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg,
 
 def get_fine_times(planet_id, target_nak):
     now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)

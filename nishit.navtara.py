@@ -45,8 +45,6 @@ def get_astro_position(planet_id, target_time):
     res = swe.calc_ut(jd, planet_id, flags)
     total_deg = res[0][0]
     
-    if planet_id == 1: total_deg = (total_deg - 2.9) % 360
-    
     rasi_idx = int(total_deg // 30) % 12
     rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
@@ -59,7 +57,7 @@ def get_astro_position(planet_id, target_time):
     pada_span = nak_span / 4.0
     pada = int(nak_deg // pada_span) + 1
     
-    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg
+    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg,
 
 def get_fine_times(planet_id, target_nak):
     now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)

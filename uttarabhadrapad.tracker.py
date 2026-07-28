@@ -50,10 +50,9 @@ def get_astro_position(planet_id, target_time):
     flags = swe.FLG_SIDEREAL | swe.FLG_TOPOCTR | swe.FLG_SWIEPH
     
     res = swe.calc_ut(jd, planet_id, flags)
-    total_deg = res[0][0]  
+    total_deg = res[0][0]
     
-    if planet_id == 1: total_deg = (total_deg - 2.9) % 360
-    
+    # sunmoon.tracker.py મુજબની સચોટ ગણતરી (બિનજરૂરી ડિગ્રી શિફ્ટ દૂર કરી છે)
     rasi_idx = int(total_deg // 30) % 12
     rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
