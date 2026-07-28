@@ -49,10 +49,14 @@ NAKSHATRAS = [
 ]
 
 def format_dms(deg):
-    d = int(deg)
-    m = int((deg - d) * 60)
-    s = int(((deg - d) * 60 - m) * 60)
-    return f"{d}°{m}'{s}\""
+    try:
+        deg = float(deg)
+        d = int(deg)
+        m = int((deg - d) * 60)
+        s = round(((deg - d) * 60 - m) * 60, 1)
+        return f"{d}° {m:02d}' {s:04.1f}\""
+    except Exception as e:
+        return f"{deg:.2f}°"
 
 def get_astro_position(planet_id, target_time):
     """ sunmoon.tracker.py વાળું 100% સચોટ નિરયણ ડિગ્રી અને પદ લોજિક """
@@ -161,11 +165,15 @@ def run_tracker():
                         curr_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
                         curr_rasi, curr_rd, curr_nak, curr_pada, curr_nd, curr_td, _ = get_astro_position(p_id, curr_time)
 
-                        # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
+                        # ફાઇનल પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ (અપડેટ કરેલ)
+                        curr_rd_formatted = format_dms(curr_rd)
+                        curr_nd_formatted = format_dms(curr_nd)
+                        curr_td_formatted = format_dms(curr_td)
+
                         msg = (f"<b>🌟 પુષ્કર નવાંશ એલર્ટ : {name}</b>\n\n"
-                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_td:.2f}° ({format_dms(curr_td)})\n"
-                               f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {format_dms(curr_rd)})\n"
-                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} - {curr_pada} (નક્ષત્ર ડિગ્રી: {format_dms(curr_nd)})\n"
+                               f"• <b>કુલ નિરયણ ડિગ્રી:</b> {curr_td:.2f}° ({curr_td_formatted})\n"
+                               f"• <b>વર્તમાન સ્થિતિ:</b> {curr_rasi} રાશિ (રાશિ ડિગ્રી: {curr_rd_formatted})\n"
+                               f"• <b>વર્તમાન નક્ષત્ર સ્થિતિ:</b> {curr_nak} - {curr_pada} (નક્ષત્ર ડિગ્રી: {curr_nd_formatted})\n"
                                f"• <b>ભવિષ્યનું નક્ષત્ર:</b> <b>{entry['nakshatra']}</b>\n"
                                f"• <b>પુષ્કર નક્ષત્ર ભાગ:</b> {entry['nakshatra']} - {entry['pada']} (ચરણ પ્રવેશ)\n"
                                f"• <b>નક્ષત્ર પદ પ્રવેશ:</b> {entry_time.strftime('%d %b, %H:%M')}\n"
