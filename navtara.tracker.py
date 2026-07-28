@@ -145,7 +145,7 @@ def run_tracker():
     future_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30) + timedelta(hours=12)
 
     for p_id, p_name in planets.items():
-        fut_rasi, fut_r_deg, fut_n, fut_pada, fut_n_deg, fut_t_deg = get_astro_position(p_id, future_time)
+        fut_rasi, fut_r_deg, fut_n, fut_pada, fut_n_deg, fut_t_deg, _ = get_astro_position(p_id, future_time)
         
         for tara, naks in NAVTARA_DATA.items():
             if fut_n in naks:
