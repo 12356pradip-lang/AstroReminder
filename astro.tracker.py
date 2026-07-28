@@ -41,6 +41,9 @@ PUSHKAR_DATA = [
     {"nakshatra": "ઉત્તરાષાઢા", "pada": 2, "navansh_rashi": "ધનુ", "mul_tatva": "અગ્નિ", "nav_tatva": "અગ્નિ", "pradhan": "અગ્નિ (પ્રબળ)"}
 ]
 
+RASHIS = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
+NAKSHATRAS = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+
 def format_dms(deg):
     d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
@@ -59,14 +62,12 @@ def get_astro_position(planet_id, target_time):
     if planet_id == 1: total_deg = (total_deg - 2.9) % 360
     
     rasi_idx = int(total_deg // 30) % 12
-    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
-    rasi_name = rashis[rasi_idx]
+    rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
     
     nak_span = 360.0 / 27.0  # 13.333333333333334
     nak_idx = int(total_deg // nak_span) % 27
-    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    nak_name = nakshatras[nak_idx]
+    nak_name = NAKSHATRAS[nak_idx]
     
     nak_deg = total_deg % nak_span
     pada_span = nak_span / 4.0
@@ -100,11 +101,11 @@ def get_fine_transition(p_id, target_entry):
             t_exit += timedelta(hours=1)
         return entry_t, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
 
-    else:  # ચંદ્ર માટે (30 કલાકની પરફેક્ટ લિમિટ)
+    else:  # ચંદ્ર માટે (હાઈ-પ્રિસિઝન મિનિટ બેઝ્ડ સર્ચ)
         start = now - timedelta(days=2)
         entry_t = None
         entry_data = None
-        for i in range(0, 72 * 60):  
+        for i in range(0, 72 * 60, 5):  
             t_check = start + timedelta(minutes=i)
             rasi, r_deg, n, p, n_deg, t_deg = get_astro_position(p_id, t_check)
             if n == target_entry["nakshatra"] and p == target_entry["pada"]:
@@ -113,11 +114,22 @@ def get_fine_transition(p_id, target_entry):
                 break
                 
         if entry_t:
+            # ફાઈન મિનિટ ટ્યુનિંગ
+            fine_start = entry_t - timedelta(minutes=10)
+            for m in range(0, 20):
+                t_f = fine_start + timedelta(minutes=m)
+                rasi, r_deg, n, p, n_deg, t_deg = get_astro_position(p_id, t_f)
+                if n == target_entry["nakshatra"] and p == target_entry["pada"]:
+                    entry_t = t_f
+                    entry_data = (rasi, r_deg, p, n_deg, t_deg)
+                    break
+
+            t_exit = entry_t + timedelta(hours=1)
             for k in range(1, 30 * 60):
-                t_exit = entry_t + timedelta(minutes=k)
-                rasi_e, r_deg_e, n_e, p_e, n_deg_e, t_deg_e = get_astro_position(p_id, t_exit)
+                t_ex_check = entry_t + timedelta(minutes=k)
+                rasi_e, r_deg_e, n_e, p_e, n_deg_e, t_deg_e = get_astro_position(p_id, t_ex_check)
                 if n_e != target_entry["nakshatra"] or p_e != target_entry["pada"]:
-                    return entry_t, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
+                    return entry_t, t_ex_check, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
                     
         return None, None, None, None, None, None, None
 
@@ -156,9 +168,6 @@ def run_tracker():
                         # ૧. અત્યારની રિયલ-ટાઇમ (Current) સ્થિતિ મેળવવા માટે
                         curr_time = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
                         curr_rasi, curr_rd, curr_nak, curr_pada, curr_nd, curr_td = get_astro_position(p_id, curr_time)
-
-                        # ૨. એન્ટ્રી ટાઇમની ચોક્કસ ડિગ્રીઓ મેળવવા માટે
-                        live_rasi, live_rd, live_nak, live_pada, live_nd, live_td = get_astro_position(p_id, entry_time)
 
                         # ફાઇનલ પ્રિન્ટ આઉટપુટ અને મેસેજ ફોર્મેટ
                         msg = (f"<b>🌟 પુષ્કર નવાંશ એલર્ટ : {name}</b>\n\n"
