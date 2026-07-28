@@ -73,7 +73,7 @@ def get_astro_position(planet_id, target_time):
     pada_span = nak_span / 4.0
     pada = int(nak_deg // pada_span) + 1
     
-    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg, jd 
+    return rasi_name, rasi_deg, nak_name, pada, nak_deg, total_deg, 
 
 def get_fine_transition(p_id, target_entry):
     now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
