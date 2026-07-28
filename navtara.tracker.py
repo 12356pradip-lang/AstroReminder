@@ -24,6 +24,9 @@ NAVTARA_DATA = {
     "અતિ મૈત્રી તારા": ["પૂર્વાષાઢા", "ભરણી", "પૂર્વા ફાલ્ગુની"]
 }
 
+RASHIS = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
+NAKSHATRAS = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
+
 def format_dms(deg):
     d = int(deg); m = int((deg - d) * 60); s = int(((deg - d) * 60 - m) * 60)
     return f"{d}°{m}'{s}\""
@@ -44,17 +47,17 @@ def get_astro_position(planet_id, target_time):
     res = swe.calc_ut(jd, planet_id, flags)
     total_deg = res[0][0]  # કુલ નિરયણ ડિગ્રી (0 થી 360)
     
+    if planet_id == 1: total_deg = (total_deg - 2.9) % 360
+    
     # ૪. રાશિ અને રાશિની ડિગ્રી ગણતરી
     rasi_idx = int(total_deg // 30) % 12
-    rashis = ["મેષ", "વૃષભ", "મિથુન", "કર્ક", "સિંહ", "કન્યા", "તુલા", "વૃશ્ચિક", "ધન", "મકર", "કુંભ", "મીન"]
-    rasi_name = rashis[rasi_idx]
+    rasi_name = RASHIS[rasi_idx]
     rasi_deg = total_deg % 30
     
     # ૫. નક્ષત્ર અને ચરણ ગણતરી (રિયલ-ટાઇમ સચોટ)
     nak_span = 360.0 / 27.0  
     nak_idx = int(total_deg // nak_span) % 27
-    nakshatras = ["અશ્વિની", "ભરણી", "કૃતિકા", "રોહિણી", "મૃગશીર્ષ", "આર્દ્રા", "પુનર્વસુ", "પુષ્ય", "આશ્લેષા", "મઘા", "પૂર્વા ફાલ્ગુની", "ઉત્તરા ફાલ્ગુની", "હસ્ત", "ચિત્રા", "સ્વાતિ", "વિશાખા", "અનુરાધા", "જ્યેષ્ઠા", "મૂળ", "પૂર્વાષાઢા", "ઉત્તરાષાઢા", "શ્રવણ", "ધનિષ્ટા", "શતભિષા", "પૂર્વા ભાદ્રપદ", "ઉત્તરા ભાદ્રપદ", "રેવતી"]
-    nak_name = nakshatras[nak_idx]
+    nak_name = NAKSHATRAS[nak_idx]
     
     nak_deg = total_deg % nak_span
     pada_span = nak_span / 4.0
@@ -88,11 +91,11 @@ def get_fine_times(planet_id, target_nak):
             t_exit += timedelta(hours=1)
         return entry, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
 
-    else:  # ચંદ્ર માટે
+    else:  # ચંદ્ર માટે (હાઈ-પ્રિસિઝન મિનિટ બેઝ્ડ સર્ચ અને ફાઈન ટ્યુનિંગ)
         start = now - timedelta(days=2)
         entry = None
         entry_data = None
-        for i in range(0, 72 * 60):  
+        for i in range(0, 72 * 60, 5):  
             t_check = start + timedelta(minutes=i)
             rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_check)
             if nak == target_nak:
@@ -101,11 +104,22 @@ def get_fine_times(planet_id, target_nak):
                 break
                 
         if entry:
+            # ફાઈન મિનિટ ટ્યુનિંગ
+            fine_start = entry - timedelta(minutes=10)
+            for m in range(0, 20):
+                t_f = fine_start + timedelta(minutes=m)
+                rasi, r_deg, nak, pada, n_deg, t_deg = get_astro_position(planet_id, t_f)
+                if nak == target_nak:
+                    entry = t_f
+                    entry_data = (rasi, r_deg, pada, n_deg, t_deg)
+                    break
+
+            t_exit = entry + timedelta(hours=1)
             for k in range(1, 30 * 60):
-                t_exit = entry + timedelta(minutes=k)
-                rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_exit)
+                t_ex_check = entry + timedelta(minutes=k)
+                rasi_e, r_deg_e, nak_e, pada_e, n_deg_e, t_deg_e = get_astro_position(planet_id, t_ex_check)
                 if nak_e != target_nak:
-                    return entry, t_exit, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
+                    return entry, t_ex_check, entry_data[0], entry_data[1], entry_data[2], entry_data[3], entry_data[4]
                     
         return None, None, None, None, None, None, None
 
@@ -174,7 +188,7 @@ def run_tracker():
                            f"• <b>ભવિષ્યનું નવતારા નક્ષત્ર:</b> <b>{tara} ({fut_n})</b>\n"
                            f"• <b>નક્ષત્ર પ્રવેશ સમય:</b> {entry_t.strftime('%d %b, %H:%M')}\n"
                            f"• <b>નક્ષત્ર નિર્ગમન સમય:</b> {exit_t.strftime('%d %b, %H:%M')}")
-                       
+                    
                     if TELEGRAM_TOKEN:
                         url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
                         requests.get(url)
