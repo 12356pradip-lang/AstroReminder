@@ -98,14 +98,41 @@ def get_nakshatra_pada_times(planet_id, current_time, current_nak):
             
     return pada_schedule
 
+def is_already_sent_today(today_str):
+    """
+    હિસ્ટ્રી ફાઇલમાં ચેક કરે છે કે આજની તારીખ પહેલેથી નોંધાયેલી છે કે નહીં.
+    """
+    if not os.path.exists(HISTORY_FILE):
+        return False
+    
+    with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+        content = f.read()
+        if today_str in content:
+            return True
+    return False
+
+def save_to_history(today_str):
+    """
+    આજની તારીખને હિસ્ટ્રી ફાઇલમાં સેવ કરે છે.
+    """
+    with open(HISTORY_FILE, "a", encoding="utf-8") as f:
+        f.write(f"Report sent on: {today_str}\n")
+
 def run_tracker():
-    planets = {0: "સૂર્ય (Sun)", 1: "ચંદ્ર (Moon)"}
     now = datetime.now(timezone.utc) + timedelta(hours=5, minutes=30)
+    today_str = now.strftime("%Y-%m-%d")  # ઉદાહરણ તરીકે: '2026-07-29'
+
+    # 1. ચેક કરો કે આજની તારીખનો રિપોર્ટ અગાઉ મોકલાયો છે કે નહીં
+    if is_already_sent_today(today_str):
+        print(f"[{today_str}] આજનો રિપોર્ટ ઓલરેડી સેન્ડ થઈ ગયો છે, તેથી ડુપ્લિકેટ એલર્ટ રદ કરવામાં આવી છે.")
+        return
+
+    planets = {0: "સૂર્ય (Sun)", 1: "ચંદ્ર (Moon)"}
+    full_msg = ""
 
     for p_id, p_name in planets.items():
         rasi_name, rasi_deg, nak_name, current_pada, nak_deg, total_deg, jd = get_astro_position(p_id, now)
         
-        # પદની ગણતરી મેળવીએ
         padas = get_nakshatra_pada_times(p_id, now, nak_name)
         
         padas_text = ""
@@ -113,18 +140,26 @@ def run_tracker():
             active_mark = " ◄ (ચાલુ)" if p_num == current_pada else ""
             padas_text += f"  • પદ {p_num}: {p_start.strftime('%d %b, %H:%M')} થી {p_end.strftime('%d %b, %H:%M')}{active_mark}\n"
 
-        msg = (f"<b>🌟 એસ્ટ્રો લાઈવ ડીટે્લ્ડ રિપોર્ટ : {p_name}</b>\n\n"
+        msg = (f"<b>🌟 લાઈવ રિપોર્ટ : {p_name}</b>\n\n"
                f"• <b>કુલ નિરયણ ડિગ્રી:</b> {total_deg:.2f}° ({format_dms(total_deg)})\n"
                f"• <b>વર્તમાન સ્થિતિ:</b> {rasi_name} રાશિ (ડિગ્રી: {format_dms(rasi_deg)})\n"
                f"• <b>નક્ષત્ર સ્થિતિ:</b> {nak_name} (પદ {current_pada} | ડિગ્રી: {format_dms(nak_deg)})\n\n"
-               f"<b>📅 નક્ષત્રના ચારેય પદની વિગત:</b>\n{padas_text}")
+               f"<b>📅 નક્ષત્રના ચારેય પદની વિગત:</b>\n{padas_text}\n\n")
+        
+        full_msg += msg
+        print(f"\n{msg.replace('<b>','').replace('</b>','')}")
 
-        print(f"\n{msg.replace('<b>','').replace('<b>','').replace('</b>','')}")
-
-        # ટેલિગ્રામ મોકલવા માટે
-        if TELEGRAM_TOKEN:
-            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(msg)}&parse_mode=HTML"
-            requests.get(url)
+    # 2. ટેલિગ્રામ પર મેસેજ મોકલો (જો ટોકન ઉપલબ્ધ હોય તો)
+    if TELEGRAM_TOKEN and full_msg:
+        url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage?chat_id={TELEGRAM_CHAT_ID}&text={urllib.parse.quote(full_msg)}&parse_mode=HTML"
+        response = requests.get(url)
+        
+        # જો મેસેજ સફળતાપૂર્વક સેન્ડ થઈ જાય, તો જ તારીખ હિસ્ટ્રી ફાઇલમાં રેકોર્ડ કરો
+        if response.status_code == 200:
+            save_to_history(today_str)
+            print(f"[{today_str}] ટેલિગ્રામ એલર્ટ સફળતાપૂર્વક મોકલાઈ ગઈ છે અને હિસ્ટ્રી ફાઇલમાં સેવ થઈ ગઈ છે.")
+        else:
+            print(f"ટેલિગ્રામ એપીઆઈ એરર: {response.text}")
 
 if __name__ == "__main__":
     run_tracker()
