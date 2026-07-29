@@ -7,8 +7,8 @@ from googleapiclient.discovery import build
 from google.oauth2 import service_account
 
 # --- કોન્ફિગરેશન ---
-TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
-TELEGRAM_CHAT_ID = "478006282"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN_PRADIP")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID_PRADIP")
 SERVICE_ACCOUNT_FILE = 'credentials.json'
 CALENDAR_ID = '12356pradip@gmail.com'
 SCOPES = ['https://www.googleapis.com/auth/calendar']

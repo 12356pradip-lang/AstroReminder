@@ -25,17 +25,26 @@ jobs:
         run: |
           echo '${{secrets.CREDENTIALS_JSON}}' > credentials.json
 
-      - name: Run Tracker
+      - name: Run PRADIP Tracker
+        env:
+          TELEGRAM_TOKEN_PRADIP: ${{ secrets.TELEGRAM_TOKEN_PRADIP }}
+          TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}
         run: |
           python astro.tracker.py
           python navtara.tracker.py
-          python nishit.navtara.py
           python uttarabhadrapad.tracker.py
-          python tithi.tracker.py 
+          python tithi.tracker.py
+
+      - name: Run NISHIT Tracker
+        env:
+          TELEGRAM_TOKEN_NISHIT: ${{ secrets.TELEGRAM_TOKEN_NISHIT }}
+          TELEGRAM_CHAT_ID_NISHIT: ${{ secrets.TELEGRAM_CHAT_ID_NISHIT }}
+        run:  |  
+          python nishit.navtara.py
 
       - name: Commit updated history
         run: |
           git config --global user.name 'GitHub Actions'
           git config --global user.email 'actions@github.com'
-          git add alert_history.txt astro_alert_history.txt pushkar_specials_history.txt nishit_history.txt
+          git add alert_history.txt astro_alert_history.txt pushkar_specials_history.txt nishit_history.txt tithi_alert_history.txt
           git diff --quiet && git diff --staged --quiet || (git commit -m "Update alert history file" && git push)

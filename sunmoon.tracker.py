@@ -5,8 +5,8 @@ import os
 import urllib.parse
 
 # --- કોન્ફિગરેશન ---
-TELEGRAM_TOKEN = "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
-TELEGRAM_CHAT_ID = "478006282"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN_PRADIP")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID_PRADIP")
 LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "sun_moon_detail_history.txt"
 

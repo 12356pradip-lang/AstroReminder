@@ -5,8 +5,8 @@ import os
 import urllib.parse
 
 # --- કોન્ફિગરેશન ---
-TELEGRAM_TOKEN = "8795156986:AAGoUEF_iZKhD91Nhv6UbkshhUBSB3YQcT8"
-TELEGRAM_CHAT_ID = "8713489324"
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN_NISHIT")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID_NISHIT")
 LAT, LON = 22.2735, 70.7513
 HISTORY_FILE = "nishit_history.txt"
 

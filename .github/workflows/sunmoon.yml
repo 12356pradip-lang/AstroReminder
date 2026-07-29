@@ -26,6 +26,11 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyswisseph requests
 
+    - name: Run Tracker
+      env:
+        TELEGRAM_TOKEN_PRADIP: ${{ secrets.TELEGRAM_TOKEN_PRADIP }}
+        TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}    
+
     - name: sunmoon.tracker.py પ્રોગ્રામ ચાલુ કરી રહ્યા છીએ
       run: |
         python sunmoon.tracker.py
