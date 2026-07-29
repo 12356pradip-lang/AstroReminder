@@ -95,7 +95,6 @@ def run_tithi_tracker():
         
         if not is_alert_sent(alert_id):
             msg = (f"🌟 {found_tithi} એડવાન્સ એલર્ટ\n"
-                   f"--------------------------------------------------\n"
                    f"શરૂઆત સમય: {tithi_start_time.strftime('%d %b, %A, %H:%M')}\n"
                    f"સમાપ્તિ સમય: {tithi_end_time.strftime('%d %b, %A, %H:%M')}\n\n"
                    f"☀️ સૂર્ય: {sun_info}\n"
