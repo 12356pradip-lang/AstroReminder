@@ -2,8 +2,8 @@ name: Sun Moon Tracker Daily Run
 
 on:
   schedule:
-    # દરરોજ સવારે 09:00 AM IST (જે UTC મુજબ રાત્રે 03:30 થાય છે) પર રન થશે
-    - cron: '30 3 * * *'
+    # દરરોજ સવારે 08:00 AM IST (જે UTC મુજબ રાત્રે 02:30 થાય છે) પર રન થશે
+    - cron: '30 2 * * *'
   
   # જાતે (Manual) રન કરવા માટેનો વિકલ્પ
   workflow_dispatch:
@@ -26,11 +26,9 @@ jobs:
         python -m pip install --upgrade pip
         pip install pyswisseph requests
 
-    - name: Run Tracker
+    - name: sunmoon.tracker.py પ્રોગ્રામ ચાલુ કરી રહ્યા છીએ
       env:
         TELEGRAM_TOKEN_PRADIP: ${{ secrets.TELEGRAM_TOKEN_PRADIP }}
-        TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}    
-
-    - name: sunmoon.tracker.py પ્રોગ્રામ ચાલુ કરી રહ્યા છીએ
+        TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}
       run: |
         python sunmoon.tracker.py
