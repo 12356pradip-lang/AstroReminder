@@ -8,6 +8,11 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    
+    # 👈 આ પરવાનગી ઉમેરવાથી GitHub Actions ફાઇલને પુશ (Push) કરી શકશે
+    permissions:
+      contents: write
+
     steps:
       - uses: actions/checkout@v3
 
