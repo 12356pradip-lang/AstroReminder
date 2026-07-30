@@ -51,7 +51,7 @@ def send_telegram_alert(bot_token, chat_id, message):
 def send_telegram_top10_and_csv_daily(
     bot_token, chat_id, passed_stocks, min_pass_score
 ):
-    """Top 10 Daily સ્ટોક્સ મોકલશે અને બાકીના સ્ટોક્સની CSV અટેચ કરશે."""
+    """Top 10 Daily સ્ટોક્સ મોકલશે અને બાકીના સ્ટોક્સની CSV અટેચ કરશે (1024 Char Limit Safe)."""
     if not bot_token or not chat_id:
         print("⚠️ ટેલિગ્રામ બોટ ટોકન અથવા ચેટ આઈડી મળેલ નથી.")
         return False
@@ -60,28 +60,22 @@ def send_telegram_top10_and_csv_daily(
     top_10_stocks = passed_stocks[:10]
     remaining_stocks = passed_stocks[10:]
 
-    # 2. Top 10 માટે સુંદર Message/Caption બનાવો
-    caption = f"⚡ *12-Marks Advanced DAILY Screener Report*\n"
-    caption += f"📊 Total Candidates Found: *{len(passed_stocks)}*\n\n"
-    caption += f"🔥 *TOP {len(top_10_stocks)} STRONGEST DAILY CANDIDATES:* 🔥\n"
-    caption += "───────────────────────────\n"
+    # 2. Telegram Caption 1024 char ની લિમિટમાં રહે તેવો ટૂંકો બનાવો
+    caption = f"⚡ *12-Marks DAILY Screener Report*\n"
+    caption += f"📊 Total Candidates: *{len(passed_stocks)}*\n\n"
+    caption += f"🔥 *TOP {len(top_10_stocks)} CANDIDATES:* 🔥\n"
 
     for idx, st in enumerate(top_10_stocks, 1):
-        tag = (
-            "🔥 STRONG BUY"
-            if st["total_score"] >= min_pass_score
-            else "👀 WATCHLIST"
-        )
+        tag = "🔥BUY" if st["total_score"] >= min_pass_score else "👀WATCH"
+        # મેસેજ ટૂંકો રાખવો જેથી 1024 અક્ષરોની લિમિટ ક્રોસ ન થાય
         caption += f"*{idx}. {st['symbol']}* [{tag}]\n"
-        caption += f"• Score: *{st['total_score']}/12* (Tech: {st['tech_score']} | Fund: {st['fund_score']})\n"
-        caption += f"• Price: ₹{st['close']} | Daily RSI: {st['rsi']} | IV: ₹{st['iv']}\n"
-        caption += f"• Triggers: {', '.join(st['reasons'][:2])}\n\n"
+        caption += f"• Score: *{st['total_score']}/12* | Price: ₹{st['close']} | RSI: {st['rsi']}\n"
 
     # 3. જો 10 થી વધુ સ્ટોક્સ હોય તો CSV મોકલો, નહીંતર ફક્ત ટેક્સ્ટ
     if remaining_stocks:
-        caption += f"📁 *નોંધ:* બાકીના *{len(remaining_stocks)}* સ્ટોક્સનું લિસ્ટ નીચે આપેલી CSV ફાઈલમાં જોડાયેલ છે."
+        caption += f"\n📁 *બાકીના {len(remaining_stocks)} સ્ટોક્સની વિગતવાર CSV નીચે જોડેલ છે.*"
 
-        # CSV ફાઈલ તૈયાર કરો (માત્ર બાકીના સ્ટોક્સ માટે)
+        # CSV ફાઈલ તૈયાર કરો (બાકીના તમામ સ્ટોક્સ માટે)
         csv_filename = "remaining_daily_stocks.csv"
         clean_data = []
         for st in remaining_stocks:
@@ -120,7 +114,9 @@ def send_telegram_top10_and_csv_daily(
                 os.remove(csv_filename)
 
             if res_data.get("ok"):
-                print("✅ Daily Top 10 Alert અને બાકીના સ્ટોક્સની CSV સફળતાપૂર્વક મોકલાઈ ગઈ.")
+                print(
+                    "✅ Daily Top 10 Alert અને બાકીના સ્ટોક્સની CSV સફળતાપૂર્વક મોકલાઈ ગઈ."
+                )
                 return True
             else:
                 print(
