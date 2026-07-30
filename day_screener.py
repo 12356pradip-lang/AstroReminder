@@ -19,9 +19,10 @@ def load_config(config_path="daily.yml"):
 
 
 # ==============================================================================
-# 2. TELEGRAM ALERT FUNCTION (VIA GITHUB SECRETS)
+# 2. TELEGRAM ALERT & DOCUMENT FUNCTION
 # ==============================================================================
 def send_telegram_alert(bot_token, chat_id, message):
+    """સામાન્ય ટેક્સ્ટ મેસેજ મોકલવા માટેનું ફંક્શન (Start/Nil message)."""
     if not bot_token or not chat_id:
         print("⚠️ ટેલિગ્રામ બોટ ટોકન અથવા ચેટ આઈડી મળેલ નથી.")
         return False
@@ -45,6 +46,93 @@ def send_telegram_alert(bot_token, chat_id, message):
     except Exception as e:
         print(f"❌ ટેલિગ્રામ કનેક્શન એરર: {e}")
         return False
+
+
+def send_telegram_top10_and_csv_daily(
+    bot_token, chat_id, passed_stocks, min_pass_score
+):
+    """Top 10 Daily સ્ટોક્સ મોકલશે અને બાકીના સ્ટોક્સની CSV અટેચ કરશે."""
+    if not bot_token or not chat_id:
+        print("⚠️ ટેલિગ્રામ બોટ ટોકન અથવા ચેટ આઈડી મળેલ નથી.")
+        return False
+
+    # 1. Top 10 અને બાકીના સ્ટોક્સ અલગ કરો
+    top_10_stocks = passed_stocks[:10]
+    remaining_stocks = passed_stocks[10:]
+
+    # 2. Top 10 માટે સુંદર Message/Caption બનાવો
+    caption = f"⚡ *12-Marks Advanced DAILY Screener Report*\n"
+    caption += f"📊 Total Candidates Found: *{len(passed_stocks)}*\n\n"
+    caption += f"🔥 *TOP {len(top_10_stocks)} STRONGEST DAILY CANDIDATES:* 🔥\n"
+    caption += "───────────────────────────\n"
+
+    for idx, st in enumerate(top_10_stocks, 1):
+        tag = (
+            "🔥 STRONG BUY"
+            if st["total_score"] >= min_pass_score
+            else "👀 WATCHLIST"
+        )
+        caption += f"*{idx}. {st['symbol']}* [{tag}]\n"
+        caption += f"• Score: *{st['total_score']}/12* (Tech: {st['tech_score']} | Fund: {st['fund_score']})\n"
+        caption += f"• Price: ₹{st['close']} | Daily RSI: {st['rsi']} | IV: ₹{st['iv']}\n"
+        caption += f"• Triggers: {', '.join(st['reasons'][:2])}\n\n"
+
+    # 3. જો 10 થી વધુ સ્ટોક્સ હોય તો CSV મોકલો, નહીંતર ફક્ત ટેક્સ્ટ
+    if remaining_stocks:
+        caption += f"📁 *નોંધ:* બાકીના *{len(remaining_stocks)}* સ્ટોક્સનું લિસ્ટ નીચે આપેલી CSV ફાઈલમાં જોડાયેલ છે."
+
+        # CSV ફાઈલ તૈયાર કરો (માત્ર બાકીના સ્ટોક્સ માટે)
+        csv_filename = "remaining_daily_stocks.csv"
+        clean_data = []
+        for st in remaining_stocks:
+            clean_data.append({
+                "Symbol": st["symbol"],
+                "Total Score": st["total_score"],
+                "Tech Score": st["tech_score"],
+                "Fund Score": st["fund_score"],
+                "Close Price": st["close"],
+                "Intrinsic Value": st["iv"],
+                "Daily RSI": st["rsi"],
+                "Triggers": " | ".join(st["reasons"]),
+            })
+
+        df = pd.DataFrame(clean_data)
+        df.to_csv(csv_filename, index=False)
+
+        # Telegram sendDocument API
+        url = f"https://api.telegram.org/bot{bot_token}/sendDocument"
+        payload = {
+            "chat_id": chat_id,
+            "caption": caption,
+            "parse_mode": "Markdown",
+        }
+
+        try:
+            with open(csv_filename, "rb") as file:
+                files = {"document": file}
+                response = requests.post(
+                    url, data=payload, files=files, timeout=20
+                )
+                res_data = response.json()
+
+            # ટેમ્પરરી ફાઈલ દૂર કરો
+            if os.path.exists(csv_filename):
+                os.remove(csv_filename)
+
+            if res_data.get("ok"):
+                print("✅ Daily Top 10 Alert અને બાકીના સ્ટોક્સની CSV સફળતાપૂર્વક મોકલાઈ ગઈ.")
+                return True
+            else:
+                print(
+                    f"❌ ટેલિગ્રામ API એરર (CSV): {res_data.get('description')}"
+                )
+                return False
+        except Exception as e:
+            print(f"❌ ટેલિગ્રામ CSV કનેક્શન એરર: {e}")
+            return False
+    else:
+        # જો સ્ટોક્સ 10 કે તેથી ઓછા જ હોય તો ફક્ત મેસેજ જશે
+        return send_telegram_alert(bot_token, chat_id, caption)
 
 
 # ==============================================================================
@@ -286,26 +374,15 @@ def main():
         )
         send_telegram_alert(bot_token, chat_id, nil_message)
     else:
+        # સ્કોર મુજબ સોર્ટ કરો
         passed_stocks.sort(key=lambda x: x["total_score"], reverse=True)
-        report_msg = f"⚡ *12-Marks Advanced DAILY Screener Found {len(passed_stocks)} Candidates!*\n\n"
 
-        for st in passed_stocks:
-            min_pass = config.get("scoring_rules", {}).get("min_score_pass", 8)
-            tag = (
-                "🔥 *STRONG BUY (DAILY)*"
-                if st["total_score"] >= min_pass
-                else "👀 *WATCHLIST (DAILY)*"
-            )
-            report_msg += f"{tag}\n"
-            report_msg += f"• *Stock:* {st['symbol']}\n"
-            report_msg += f"• *Total Score:* {st['total_score']}/12 Marks\n"
-            report_msg += f"• *Technical:* {st['tech_score']}/6  |  *Fundamental:* {st['fund_score']}/6\n"
-            report_msg += f"• *Price:* ₹{st['close']}\n"
-            report_msg += f"• *Intrinsic Value:* ₹{st['iv']}\n"
-            report_msg += f"• *Daily RSI:* {st['rsi']}\n"
-            report_msg += f"• *Triggers:* {', '.join(st['reasons'][:3])}\n\n"
+        min_pass = config.get("scoring_rules", {}).get("min_score_pass", 8)
 
-        send_telegram_alert(bot_token, chat_id, report_msg)
+        # Top 10 + બાકીના સ્ટોક્સની CSV મોકલો
+        send_telegram_top10_and_csv_daily(
+            bot_token, chat_id, passed_stocks, min_pass
+        )
 
 
 if __name__ == "__main__":
