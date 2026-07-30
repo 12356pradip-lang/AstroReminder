@@ -82,16 +82,19 @@ def run_tithi_tracker():
         if tithi_type and not found_tithi:
             if abs((t_check - now_local).total_seconds()) < 86400:
                 found_tithi = tithi_type
-                tithi_start_time = t_check - timedelta(hours=12)
-                tithi_end_time = t_check + timedelta(hours=12)
+                # સમયમાં ફ્લક્ચ્યુએશન અટકાવવા માટે મિનિટ્સ અને સેકન્ડ્સ ઝીરો કરી નાખીએ
+                t_check_fixed = t_check.replace(minute=0, second=0, microsecond=0)
+                tithi_start_time = t_check_fixed - timedelta(hours=12)
+                tithi_end_time = t_check_fixed + timedelta(hours=12)
                 sun_info, _ = get_celestial_info(jd, 0)
                 moon_info, _ = get_celestial_info(jd, 1)
                 final_diff = diff
                 break
 
     if found_tithi and tithi_start_time:
-        # યુનિક એલર્ટ આઈડી બનાવો (જેથી ડુપ્લિકેટ એન્ટ્રી ક્યારેય ન થાય)
-        alert_id = f"{found_tithi}_{tithi_start_time.strftime('%Y%m%d_%H%M')}"
+        # સુધારો: યુનિક આઈડીમાં માત્ર તિથિનું નામ અને તારીખ જ રાખીશું જેથી કલાક બદલાવા છતાં આઈડી સરખો જ રહે
+        alert_date_str = tithi_start_time.strftime('%Y-%m-%d')
+        alert_id = f"{found_tithi}_{alert_date_str}"
         
         if not is_alert_sent(alert_id):
             msg = (f"🌟 {found_tithi} એડવાન્સ એલર્ટ\n"
