@@ -1,52 +1,47 @@
 # ==============================================================================
-# DAILY.YML - Configuration for 1-Day Chart Screening
-# Technical: Daily 4 EMAs (4, 20, 55, 200) + Daily Doji + Fib 61.8% + Strict RSI
-# Fundamental: ROE, D/E, Promoter, Growth + CWIP Expansion Analysis
-# Scoring Criteria: Total 11 Marks Pass Pipeline
+# DAILY.YML - Configuration File (Daily Timeframe)
+# Technical (6 Marks): 125-150 Days Consolidation + Daily Super Junction + 
+#                      Bottom Reversal + RSI 60 Breakout (60-63) + Daily 200 EMA + Fib
+# Fundamental (6 Marks): ROE, D/E, Promoter, Rev/Profit Growth + CWIP Expansion
+# Scoring Criteria: Total 12 Marks Pass Pipeline
 # ==============================================================================
 
-# 1. Telegram Alert Credentials
+# 1. Telegram Alert Credentials (Handled via GitHub Secrets)
 telegram:
-  bot_token: "8731134888:AAGHEul75rh6HZBefn7WCrbXUCyBqJ_zeXU"
-  chat_id: "478006282"
+  bot_token: ""  # Passed via GitHub Secret: TELEGRAM_TOKEN_PRADIP
+  chat_id: ""    # Passed via GitHub Secret: TELEGRAM_CHAT_ID_PRADIP
 
-# 2. Historical Data Fetch Settings (1-Day Interval)
+# 2. Historical Data Fetch Settings (Daily Setup)
 data_settings:
   period: "max"
   interval: "1d"
 
 # 3. Technical Analysis Parameters
 technical_criteria:
-  ema_4: 4
   ema_20: 20
   ema_55: 55
   ema_200: 200
-  junction_threshold: 0.025   # 2.5% Spread Range for Junction
-  rsi_min: 60.0               # Strict Ideal RSI Start Range
-  rsi_max: 65.0       # RSI ની મહત્તમ લિમિટ (65 થી વધી જશે તો ફ્રેશ બ્રેકઆઉટ નહીં ગણાય)
-  fib_level: 0.618            # Fibonacci Golden Ratio Support
-  fib_tolerance: 0.02         # 2% Tolerance zone around 61.8%
-  
-  # EMA 4 Doji Reversal Parameters
-  #doji_body_ratio: 0.25       # Candle Body should be <= 25% of total candle range
+  junction_threshold: 0.025   # 2.5% Spread Range for EMA Super Junction
+  rsi_min: 60.0               # RSI 60+ Breakout Min Threshold
+  rsi_max: 63.0               # RSI Upper Limit Range
+  consolidation_days: 150     # Lookback window for daily top check
 
-# 4. Fundamental Criteria (Including CWIP Expansion Rules)
+# 4. Fundamental Criteria (6 Marks Setup)
 fundamental_criteria:
-  min_roe: 15.0                # Minimum ROE %
+  min_roe: 12.0                # Minimum ROE %
   max_debt_equity: 1.0        # Maximum Debt to Equity Ratio
-  min_promoter: 45.0          # Minimum Promoter Holding %
-  min_rev_growth: 10.0        # Minimum YoY Revenue Growth %
-  min_profit_growth: 10.0     # Minimum YoY Profit Growth %
+  min_promoter: 40.0          # Minimum Promoter Holding %
+  min_rev_growth: 5.0         # Minimum YoY Revenue Growth %
+  min_profit_growth: 5.0      # Minimum YoY Profit Growth %
   
-  # CWIP (Capital Work-In-Progress) Capex Expansion Criteria
+  # CWIP Capex Expansion Criteria
   cwip_rule:
-    consistent_years: 3       # 3 consecutive years of YoY CWIP increase
-    min_cwip_ratio: 0.03      # CWIP must be at least 3% of Net Block
+    consistent_years: 3       # 3 consecutive years of YoY CWIP expansion
 
-# 5. Scoring & Decision Thresholds (Total 11 Marks)
+# 5. Scoring & Decision Thresholds (Total 12 Marks Pipeline)
 scoring_rules:
-  min_score_pass: 9           # Score >= 9 -> STRONG BUY Alert
-  watch_score_pass: 7         # Score 7 or 8 -> WATCHLIST Alert
+  min_score_pass: 8           # Score >= 8/12 -> 🔥 STRONG BUY Alert (DAILY)
+  watch_score_pass: 6         # Score 6 or 7/12 -> 👀 WATCHLIST Alert (DAILY)
 
 # 6. Watchlist (Nifty Top Stocks & Growth Candidates)
 watchlist:
@@ -202,7 +197,7 @@ watchlist:
   - "POWERGRID.NS"
   - "PRESTIGE.NS"
   - "PVRINOX.NS"
-  - "REC.NS"
+  - "RECLTD.NS"
   - "RELIANCE.NS"
   - "RVNL.NS"
   - "SAIL.NS"

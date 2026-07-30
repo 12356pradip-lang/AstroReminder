@@ -1,34 +1,38 @@
 import os
-import yaml
-import requests
 import numpy as np
 import pandas as pd
+import requests
+import yaml
 import yfinance as yf
+
 
 # ==============================================================================
 # 1. LOAD CONFIGURATION (config.yml)
 # ==============================================================================
 def load_config(config_path="config.yml"):
     if not os.path.exists(config_path):
-        raise FileNotFoundError(f"કન્ફિગરેશન ફાઈલ '{config_path}' મળી નથી. કૃપા કરીને ચકાસો.")
+        raise FileNotFoundError(
+            f"કન્ફિગરેશન ફાઈલ '{config_path}' મળી નથી. કૃપા કરીને ચકાસો."
+        )
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
+
 # ==============================================================================
-# 2. TELEGRAM ALERT FUNCTION
+# 2. TELEGRAM ALERT FUNCTION (VIA GITHUB SECRETS)
 # ==============================================================================
 def send_telegram_alert(bot_token, chat_id, message):
-    if not bot_token or not chat_id or "YOUR_BOT" in str(bot_token):
-        print("⚠️ ટેલિગ્રામ બોટ ટોકન અથવા ચેટ આઈડી કન્ફિગર કરેલ નથી.")
+    if not bot_token or not chat_id:
+        print("⚠️ ટેલિગ્રામ બોટ ટોકન અથવા ચેટ આઈડી મળેલ નથી.")
         return False
-        
+
     url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
     payload = {
         "chat_id": chat_id,
         "text": message,
-        "parse_mode": "Markdown"
+        "parse_mode": "Markdown",
     }
-    
+
     try:
         response = requests.post(url, json=payload, timeout=12)
         res_data = response.json()
@@ -42,11 +46,13 @@ def send_telegram_alert(bot_token, chat_id, message):
         print(f"❌ ટેલિગ્રામ કનેક્શન એરર: {e}")
         return False
 
+
 # ==============================================================================
 # 3. NATIVE TECHNICAL INDICATORS
 # ==============================================================================
 def calculate_ema(series, span):
     return series.ewm(span=span, adjust=False).mean()
+
 
 def calculate_rsi(series, period=14):
     delta = series.diff()
@@ -55,11 +61,12 @@ def calculate_rsi(series, period=14):
     rs = gain / loss
     return 100 - (100 / (1 + rs))
 
+
 def calculate_intrinsic_value(stock):
     try:
         info = stock.info
-        eps = info.get('trailingEps', None)
-        bvps = info.get('bookValue', None)
+        eps = info.get("trailingEps", None)
+        bvps = info.get("bookValue", None)
         if eps and bvps and eps > 0 and bvps > 0:
             iv = np.sqrt(22.5 * eps * bvps)
             return round(iv, 2)
@@ -67,178 +74,236 @@ def calculate_intrinsic_value(stock):
     except Exception:
         return "N/A"
 
+
 # ==============================================================================
-# 4. TECHNICAL & FUNDAMENTAL ANALYSIS (WEEKLY CHART)
+# 4. ADVANCED TECHNICAL & FUNDAMENTAL ANALYSIS (WEEKLY CHART)
 # ==============================================================================
 def analyze_stock(ticker_symbol, config):
     try:
         stock = yf.Ticker(ticker_symbol)
-        
-        period = config['data_settings'].get('period', 'max')
-        interval = config['data_settings'].get('interval', '1wk')
-        
+
+        period = config["data_settings"].get("period", "max")
+        interval = config["data_settings"].get("interval", "1wk")
+
         df = stock.history(period=period, interval=interval)
-        
-        if df.empty or len(df) < 200:
+
+        if df.empty or len(df) < 150:
             return None
-            
-        tc = config['technical_criteria']
-        fc = config['fundamental_criteria']
-        
+
+        fc = config.get("fundamental_criteria", {})
+
         # Weekly Technical Indicators
-        df['EMA_4'] = calculate_ema(df['Close'], tc['ema_4'])
-        df['EMA_20'] = calculate_ema(df['Close'], tc['ema_20'])
-        df['EMA_55'] = calculate_ema(df['Close'], tc['ema_55'])
-        df['EMA_200'] = calculate_ema(df['Close'], tc['ema_200'])
-        df['RSI'] = calculate_rsi(df['Close'], period=14)
-        
+        df["EMA_20"] = calculate_ema(df["Close"], 20)
+        df["EMA_55"] = calculate_ema(df["Close"], 55)
+        df["EMA_200"] = calculate_ema(df["Close"], 200)
+        df["RSI"] = calculate_rsi(df["Close"], period=14)
+
         latest = df.iloc[-1]
-        close_price = latest['Close']
-        score = 0
+        close_price = latest["Close"]
+
+        tech_score = 0
+        fund_score = 0
         reasons = []
-        
-        # 1. Price > Weekly EMA 200
-        if close_price > latest['EMA_200']:
-            score += 1
-            reasons.append("Price > Weekly EMA 200")
-            
-        # 2. Weekly EMA Junction
-        ema_vals = [latest['EMA_4'], latest['EMA_20'], latest['EMA_55']]
-        ema_spread = (max(ema_vals) - min(ema_vals)) / min(ema_vals)
-        if ema_spread <= tc['junction_threshold']:
-            score += 1
-            reasons.append("Weekly EMA Junction")
-            
-        # 3. 3-Week EMA 4 Doji Reversal Breakout Logic
-        doji_breakout_found = False
-        # Look back over the last 3 weekly candles for a Doji at EMA 4
-        for i in range(1, 4):
-            if len(df) <= i:
-                break
-            candle = df.iloc[-i]
-            body_size = abs(candle['Close'] - candle['Open'])
-            total_range = candle['High'] - candle['Low']
-            
-            # Check if candle is a Doji at EMA 4
-            if total_range > 0 and (body_size / total_range) <= tc['doji_body_ratio']:
-                if candle['Low'] <= candle['EMA_4'] and candle['Close'] >= candle['EMA_4']:
-                    # Reversal Confirmation: Current close must break above this Doji's High
-                    if close_price > candle['High']:
-                        doji_breakout_found = True
-                        break
 
-        if doji_breakout_found:
-            score += 1
-            reasons.append("3-Week EMA 4 Doji Breakout")
-                
-        # 4. Strict Weekly RSI Zone (55-58)
-        if tc['rsi_min'] <= latest['RSI'] <= tc['rsi_max']:
-            score += 1
-            reasons.append(f"Strict Weekly RSI ({latest['RSI']:.1f})")
-            
-        # 5. Fibonacci Support Zone (52 Weeks High/Low)
-        high_52 = df['High'].tail(52).max()
-        low_52 = df['Low'].tail(52).min()
-        fib_618 = high_52 - (high_52 - low_52) * tc['fib_level']
-        if abs(close_price - fib_618) / fib_618 <= tc['fib_tolerance']:
-            score += 1
-            reasons.append("Fib 61.8% Support")
+        # ----------------------------------------------------------------------
+        # A. TECHNICAL ANALYSIS (6 MARKS)
+        # ----------------------------------------------------------------------
+        df_150 = df.tail(150)
+        high_150 = df_150["High"].max()
 
-        # Fundamentals Analysis
+        # 1. 125-150 Wks Consolidation
+        if close_price < high_150:
+            tech_score += 1
+            reasons.append("125-150 Wks Consolidation")
+
+        # 2. Super Junction
+        ema20 = latest["EMA_20"]
+        ema55 = latest["EMA_55"]
+        ema200 = latest["EMA_200"]
+
+        if pd.notna(ema20) and pd.notna(ema55) and pd.notna(ema200):
+            ema_vals = [ema20, ema55, ema200]
+            ema_spread = (max(ema_vals) - min(ema_vals)) / min(ema_vals)
+
+            if ema_spread <= 0.025:
+                diff_55 = (close_price - ema55) / ema55
+                diff_200 = (close_price - ema200) / ema200
+                if 0 <= diff_55 <= 0.02 and 0 <= diff_200 <= 0.02:
+                    tech_score += 1
+                    reasons.append("Super Junction (EMA 20/55/200)")
+
+        # 3. Bottom Reversal
+        recent_20_low = df["Low"].tail(20).min()
+        recent_5_close_avg = df["Close"].tail(5).mean()
+        if (
+            close_price > recent_20_low * 1.03
+            and recent_5_close_avg > recent_20_low
+        ):
+            tech_score += 1
+            reasons.append("Bottom Reversal Confirmed")
+
+        # 4. Strict RSI Zone
+        if 55.0 <= latest["RSI"] <= 58.0:
+            tech_score += 1
+            reasons.append(f"Strict RSI 55-58 ({latest['RSI']:.1f})")
+
+        # 5. 200 EMA 3rd Breakout
+        df_60 = df.tail(60).copy()
+        if "EMA_200" in df_60.columns and not df_60["EMA_200"].isnull().all():
+            above_ema200 = (df_60["Close"] > df_60["EMA_200"]).astype(int)
+            crossings = (above_ema200.diff() != 0).sum()
+            if crossings >= 4 and close_price > latest["EMA_200"]:
+                tech_score += 1
+                reasons.append("200 EMA 3rd Breakout")
+
+        # 6. Fibonacci Evaluation
+        low_150 = df_150["Low"].min()
+        fib_diff = high_150 - low_150
+        fib_382 = low_150 + (fib_diff * 0.382)
+        fib_500 = low_150 + (fib_diff * 0.500)
+
+        if (
+            abs(close_price - fib_382) / fib_382 <= 0.03
+            or abs(close_price - fib_500) / fib_500 <= 0.03
+        ):
+            tech_score += 1
+            reasons.append("Fibonacci Reversal Support")
+
+        # ----------------------------------------------------------------------
+        # B. FUNDAMENTAL ANALYSIS (6 MARKS)
+        # ----------------------------------------------------------------------
         info = stock.info
-        roe = (info.get('returnOnEquity', 0) or 0)
+        roe = info.get("returnOnEquity", 0) or 0
         roe = roe * 100 if roe < 1 else roe
-        
-        de = (info.get('debtToEquity', 0) or 0)
-        if de > 10: de = de / 100
-        
-        promoter = (info.get('heldPercentInsiders', 0) or 0) * 100
-        rev_growth = (info.get('revenueGrowth', 0) or 0) * 100
-        profit_growth = (info.get('earningsGrowth', 0) or 0) * 100
 
-        if roe >= fc['min_roe']: score += 1; reasons.append(f"ROE ({roe:.1f}%)")
-        if de <= fc['max_debt_equity']: score += 1; reasons.append(f"D/E ({de:.2f})")
-        if promoter >= fc['min_promoter']: score += 1; reasons.append(f"Promoter ({promoter:.1f}%)")
-        if rev_growth >= fc['min_rev_growth']: score += 1; reasons.append(f"Rev Growth ({rev_growth:.1f}%)")
-        if profit_growth >= fc['min_profit_growth']: score += 1; reasons.append(f"Profit Growth ({profit_growth:.1f}%)")
-            
-        # CWIP Expansion Analysis
+        de = info.get("debtToEquity", 0) or 0
+        if de > 10:
+            de = de / 100
+
+        promoter = (info.get("heldPercentInsiders", 0) or 0) * 100
+        rev_growth = (info.get("revenueGrowth", 0) or 0) * 100
+        profit_growth = (info.get("earningsGrowth", 0) or 0) * 100
+
+        if roe >= fc.get("min_roe", 12):
+            fund_score += 1
+            reasons.append(f"ROE ({roe:.1f}%)")
+        if de <= fc.get("max_debt_equity", 1.0):
+            fund_score += 1
+            reasons.append(f"D/E ({de:.2f})")
+        if promoter >= fc.get("min_promoter", 40):
+            fund_score += 1
+            reasons.append(f"Promoter ({promoter:.1f}%)")
+        if rev_growth >= fc.get("min_rev_growth", 5):
+            fund_score += 1
+            reasons.append(f"Rev Growth ({rev_growth:.1f}%)")
+        if profit_growth >= fc.get("min_profit_growth", 5):
+            fund_score += 1
+            reasons.append(f"Profit Growth ({profit_growth:.1f}%)")
+
+        # CWIP Expansion
         try:
             bs = stock.balance_sheet
-            if 'Capital Work In Progress' in bs.index:
-                cwip_vals = bs.loc['Capital Work In Progress'].dropna().head(3)
-                if len(cwip_vals) >= 3 and cwip_vals.iloc[0] > cwip_vals.iloc[1] > cwip_vals.iloc[2]:
-                    score += 1
+            if "Capital Work In Progress" in bs.index:
+                cwip_vals = bs.loc["Capital Work In Progress"].dropna().head(3)
+                if (
+                    len(cwip_vals) >= 3
+                    and cwip_vals.iloc[0] > cwip_vals.iloc[1] > cwip_vals.iloc[2]
+                ):
+                    fund_score += 1
                     reasons.append("CWIP YoY Expansion")
         except Exception:
             pass
 
         iv_val = calculate_intrinsic_value(stock)
+        total_score = tech_score + fund_score
 
         return {
             "symbol": ticker_symbol,
-            "score": score,
+            "total_score": total_score,
+            "tech_score": tech_score,
+            "fund_score": fund_score,
             "close": round(close_price, 2),
-            "rsi": round(latest['RSI'], 1),
+            "rsi": round(latest["RSI"], 1),
             "iv": iv_val,
-            "reasons": reasons
+            "reasons": reasons,
         }
 
     except Exception as e:
         print(f"Error analyzing {ticker_symbol}: {e}")
         return None
 
+
 # ==============================================================================
 # 5. MAIN DISPATCHER
 # ==============================================================================
 def main():
-    print("🚀 Starting Weekly Stock Screener Pipeline...")
+    print("🚀 Starting Advanced Weekly Stock Screener Pipeline...")
     config = load_config("config.yml")
-    
-    bot_token = config['telegram']['bot_token']
-    chat_id = config['telegram']['chat_id']
-    
-    watchlist = config.get('watchlist', [])
+
+    # GitHub Secrets માંથી ઓટોમેટિક ટોકન અને આઈડી રીડ કરશે
+    bot_token = os.getenv("TELEGRAM_TOKEN_PRADIP")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID_PRADIP")
+
+    # જો એન્વાયરમેન્ટમાંથી ન મળે તો fallback તરીકે config.yml ચેક કરશે
+    if not bot_token or not chat_id:
+        telegram_cfg = config.get("telegram", {})
+        bot_token = bot_token or telegram_cfg.get("bot_token")
+        chat_id = chat_id or telegram_cfg.get("chat_id")
+
+    watchlist = config.get("watchlist", [])
     total_stocks = len(watchlist)
-    
-    start_msg = f"🔍 *11-Marks Weekly Screener Started*\nScrutinizing total *{total_stocks}* stocks using config.yml..."
+
+    start_msg = f"🔍 *12-Marks Advanced Weekly Screener Started*\nScrutinizing total *{total_stocks}* stocks using config.yml..."
     send_telegram_alert(bot_token, chat_id, start_msg)
-    
+
     passed_stocks = []
-    
+
     for idx, symbol in enumerate(watchlist, 1):
         print(f"[{idx}/{total_stocks}] Analyzing {symbol} (Weekly)...")
         res = analyze_stock(symbol, config)
-        
-        if res and res['score'] >= config['scoring_rules']['watch_score_pass']:
+
+        if (
+            res
+            and res["total_score"]
+            >= config.get("scoring_rules", {}).get("watch_score_pass", 6)
+        ):
             passed_stocks.append(res)
 
     print("\n==================================================")
-    print(f"✅ Weekly Screening Finished. Candidates: {len(passed_stocks)}")
+    print(
+        f"✅ Advanced Weekly Screening Finished. Candidates: {len(passed_stocks)}"
+    )
     print("==================================================\n")
-    
+
     if not passed_stocks:
         nil_message = (
-            "📊 *11-Marks Weekly Stock Screener Report*\n\n"
-            "❌ *Result:* No stocks met criteria this week on Weekly Chart (0 Stocks Found).\n\n"
-            "💡 All technical & fundamental rules applied strictly."
+            "📊 *12-Marks Advanced Weekly Stock Screener Report*\n\n"
+            "❌ *Result:* No stocks met strict criteria this week on Weekly Chart (0 Stocks Found).\n\n"
+            "💡 Super Junction, Bottom Reversal & 200 EMA Breakout filters applied strictly."
         )
         send_telegram_alert(bot_token, chat_id, nil_message)
     else:
-        passed_stocks.sort(key=lambda x: x['score'], reverse=True)
-        report_msg = f"🎯 *11-Marks Weekly Screener Found {len(passed_stocks)} Candidates!*\n\n"
-        
+        passed_stocks.sort(key=lambda x: x["total_score"], reverse=True)
+        report_msg = f"🎯 *12-Marks Advanced Weekly Screener Found {len(passed_stocks)} Candidates!*\n\n"
+
         for st in passed_stocks:
-            tag = "🔥 *STRONG BUY*" if st['score'] >= config['scoring_rules']['min_score_pass'] else "👀 *WATCHLIST*"
+            min_pass = config.get("scoring_rules", {}).get("min_score_pass", 8)
+            tag = (
+                "🔥 *STRONG BUY*"
+                if st["total_score"] >= min_pass
+                else "👀 *WATCHLIST*"
+            )
             report_msg += f"{tag}\n"
             report_msg += f"• *Stock:* {st['symbol']}\n"
-            report_msg += f"• *Score:* {st['score']}/11 Marks\n"
+            report_msg += f"• *Total Score:* {st['total_score']}/12 Marks\n"
+            report_msg += f"• *Technical:* {st['tech_score']}/6  |  *Fundamental:* {st['fund_score']}/6\n"
             report_msg += f"• *Price:* ₹{st['close']}\n"
             report_msg += f"• *Intrinsic Value:* ₹{st['iv']}\n"
             report_msg += f"• *Weekly RSI:* {st['rsi']}\n"
             report_msg += f"• *Triggers:* {', '.join(st['reasons'][:3])}\n\n"
-            
+
         send_telegram_alert(bot_token, chat_id, report_msg)
+
 
 if __name__ == "__main__":
     main()

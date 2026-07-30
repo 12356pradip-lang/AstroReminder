@@ -1,4 +1,4 @@
-name: Daily Nifty 200 Screener & Telegram Alert
+name: Weekly & Daily Nifty 200 Screener & Telegram Alert
 
 on:
   schedule:
@@ -11,7 +11,7 @@ on:
     # 3. IST બપોરે 03:00 PM (UTC 09:30 AM)
     - cron: '30 9 * * 1-5'
     
-  # Manual Run Option from GitHub UI (બિલકુલ ડાબી બાજુથી શરૂ થવું જોઈએ)
+  # Manual Run Option from GitHub UI
   workflow_dispatch:
 
 jobs:
@@ -32,8 +32,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Run Main Screener Script
+      - name: Run Main Screener Script (Weekly)
+        env:
+          TELEGRAM_TOKEN_PRADIP: ${{ secrets.TELEGRAM_TOKEN_PRADIP }}
+          TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}
         run: python main_screener.py || true
 
-      - name: Run Day Screener Script
-        run: python day_screener.py  
+      - name: Run Day Screener Script (Daily)
+        env:
+          TELEGRAM_TOKEN_PRADIP: ${{ secrets.TELEGRAM_TOKEN_PRADIP }}
+          TELEGRAM_CHAT_ID_PRADIP: ${{ secrets.TELEGRAM_CHAT_ID_PRADIP }}
+        run: python day_screener.py || true
